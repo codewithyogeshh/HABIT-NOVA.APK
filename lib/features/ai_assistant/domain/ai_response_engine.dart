@@ -1,4 +1,4 @@
-/// Intelligent built-in knowledge response engine for Synvero AI Assistant.
+/// Intelligent built-in knowledge response engine for HabbitNova AI Assistant.
 ///
 /// Provides deep, contextual, and structured answers across:
 /// - Study & Learning methodologies (Pomodoro, Active Recall, Feynman, Spaced Repetition)
@@ -20,7 +20,7 @@ class AIResponseEngine {
 
     // 0. Marathi & Hindi Native Phrases
     if (_isMarathiGreeting(lower) || _isHindiGreeting(lower)) {
-      return 'नमस्कार $name! 🙏 मी तुमचा Synvero AI सहाय्यक आहे.\n\nमी तुम्हाला पुढील गोष्टींमध्ये मदत करू शकतो:\n• 📚 **अभ्यास (Study)**: अवघड विषय समजून घेणे, अभ्यासाचे वेळापत्रक बनवणे\n• 🏋️ **फिटनेस (Fitness)**: कसरत, व्यायाम आणि वर्कआउट रूटीन\n• 🥗 **आहार (Nutrition)**: निरोगी आहार, प्रथिने (Protein) आणि डाएट प्लॅन\n• ⚡ **सवयी (Habits)**: नवीन चांगल्या सवयी लावणे आणि आळस घालवणे\n\nआज तुम्हाला काय जाणून घ्यायचे आहे? विचारा!';
+      return 'नमस्कार $name! 🙏 मी तुमचा HabbitNova AI सहाय्यक आहे.\n\nमी तुम्हाला पुढील गोष्टींमध्ये मदत करू शकतो:\n• 📚 **अभ्यास (Study)**: अवघड विषय समजून घेणे, अभ्यासाचे वेळापत्रक बनवणे\n• 🏋️ **फिटनेस (Fitness)**: कसरत, व्यायाम आणि वर्कआउट रूटीन\n• 🥗 **आहार (Nutrition)**: निरोगी आहार, प्रथिने (Protein) आणि डाएट प्लॅन\n• ⚡ **सवयी (Habits)**: नवीन चांगल्या सवयी लावणे आणि आळस घालवणे\n\nआज तुम्हाला काय जाणून घ्यायचे आहे? विचारा!';
     }
 
     if (lower.contains('kasa ahes') || lower.contains('kasa aahes') || lower.contains('kase ahat') || lower.contains('kaise ho') || lower.contains('kaisa hai')) {
@@ -28,12 +28,12 @@ class AIResponseEngine {
     }
 
     if (lower.contains('kay karu') || lower.contains('kay karat ahes') || lower.contains('kya karu') || lower.contains('kya chal raha hai')) {
-      return 'मी तुम्हाला तुमच्या ध्येयांपर्यंत पोहोचवण्यासाठी मदत करत आहे! 🎯\n\nतुम्ही Synvero मध्ये:\n1. आजचे **Tasks** तपासून पूर्ण करू शकता.\n2. **Habits** ट्रॅक करून तुमची Streak टिकवू शकता.\n3. **Study Timer** वापरून २५ मिनिटे Pomodoro फोकस सेशन करू शकता.\n\nतुम्हाला आत्ता कशाची सुरुवात करायची आहे?';
+      return 'मी तुम्हाला तुमच्या ध्येयांपर्यंत पोहोचवण्यासाठी मदत करत आहे! 🎯\n\nतुम्ही HabbitNova मध्ये:\n1. आजचे **Tasks** तपासून पूर्ण करू शकता.\n2. **Habits** ट्रॅक करून तुमची Streak टिकवू शकता.\n3. **Study Timer** वापरून २५ मिनिटे Pomodoro फोकस सेशन करू शकता.\n\nतुम्हाला आत्ता कशाची सुरुवात करायची आहे?';
     }
 
     if (lower.contains('abhyas') || lower.contains('study kashi karu') || lower.contains('padhai') || lower.contains('man lagat nahi')) {
       return '📚 **अभ्यासात मन लावण्यासाठी आणि प्रभावी अभ्यासासाठी ५ सुवर्ण नियम:**\n\n'
-          '1. **पोमोडोरो पद्धत (Pomodoro Technique)**: २५ मिनिटे शांततेत अभ्यास करा आणि ५ मिनिटांचा ब्रेक घ्या. (Synvero मधील **Timer** टॅब वापरा!)\n'
+          '1. **पोमोडोरो पद्धत (Pomodoro Technique)**: २५ मिनिटे शांततेत अभ्यास करा आणि ५ मिनिटांचा ब्रेक घ्या. (HabbitNova मधील **Timer** टॅब वापरा!)\n'
           '2. **मोबाईल दूर ठेवा**: अभ्यास करताना सोशल मीडिया नोटिफिकेशन्स बंद करा.\n'
           '3. **ऍक्टिव्ह रिकॉल (Active Recall)**: फक्त वाचण्यापेक्षा वाचलेले आठवून स्वतःच्या शब्दांत लिहून काढा.\n'
           '4. **फेनमन तंत्र (Feynman Technique)**: जो विषय शिकलात, तो लहान मुलाला समजावून सांगतोय असा स्वतःलाच शिकवा.\n'
@@ -47,16 +47,16 @@ class AIResponseEngine {
           '2. **वजन नियंत्रणासाठी**: दररोज कॅलरी डेफिसिट (थोडे कमी कॅलरी खाणे) आणि पुरेसे पाणी (३-४ लिटर) प्या.\n'
           '3. **प्रथिने (Protein)**: आहारात डाळी, पनीर, अंडी किंवा स्प्राउट्सचा (मोड आलेली कडधान्ये) समावेश करा.\n'
           '4. **झोप**: स्नायूंच्या रिकव्हरीसाठी ७-८ तास गाढ झोप अतिशय आवश्यक आहे.\n\n'
-          'Synvero मधील **Fitness** टॅबमध्ये जाऊन तुम्ही तुमचे वर्कआउट्स आणि प्रोग्रेस नोंदवू शकता!';
+          'HabbitNova मधील **Fitness** टॅबमध्ये जाऊन तुम्ही तुमचे वर्कआउट्स आणि प्रोग्रेस नोंदवू शकता!';
     }
 
     // 1. Greetings & Personal Identity (English)
     if (_isGreeting(lower)) {
-      return 'Hello $name! 👋 I am your Synvero AI Assistant.\n\nI can help you with:\n• 📚 **Study & Tech**: Explaining complex topics, study strategies, code concepts\n• 🏋️ **Fitness**: Custom workout splits, proper exercise form, HIIT\n• 🥗 **Nutrition**: High-protein meal plans, calorie targets, hydration\n• ⚡ **Habits & Focus**: Beating procrastination, Pomodoro routines\n\nWhat would you like to explore today?';
+      return 'Hello $name! 👋 I am your HabbitNova AI Assistant.\n\nI can help you with:\n• 📚 **Study & Tech**: Explaining complex topics, study strategies, code concepts\n• 🏋️ **Fitness**: Custom workout splits, proper exercise form, HIIT\n• 🥗 **Nutrition**: High-protein meal plans, calorie targets, hydration\n• ⚡ **Habits & Focus**: Beating procrastination, Pomodoro routines\n\nWhat would you like to explore today?';
     }
 
     if (lower == 'who are you' || lower == 'what can you do' || lower.contains('your name')) {
-      return "I'm Synvero AI, your built-in personal growth and study companion! 🚀\n\nI'm designed to help you build bulletproof daily habits, master difficult study topics, plan nutritious meals, and stay consistent with your workout goals.\n\nTry asking me:\n• 'What is Java?'\n• 'How to study effectively?'\n• 'High-protein vegetarian breakfast ideas'\n• 'Upper body workout plan'";
+      return "I'm HabbitNova AI, your built-in personal growth and study companion! 🚀\n\nI'm designed to help you build bulletproof daily habits, master difficult study topics, plan nutritious meals, and stay consistent with your workout goals.\n\nTry asking me:\n• 'What is Java?'\n• 'How to study effectively?'\n• 'High-protein vegetarian breakfast ideas'\n• 'Upper body workout plan'";
     }
 
     if (lower == 'thank you' || lower == 'thanks' || lower.contains('thank u') || lower.contains('dhanyavad')) {
@@ -290,7 +290,7 @@ class AIResponseEngine {
         '1. **Active Recall**: Test yourself instead of passive re-reading. Close your notes and write what you remember.\n'
         '2. **Spaced Repetition**: Review topics at increasing intervals (Day 1, Day 3, Day 7, Day 14).\n'
         '3. **Feynman Technique**: Explain the concept out loud as if teaching a 10-year-old. Identify gaps where you get stuck.\n'
-        '4. **Deep Focus Blocks**: Use Synvero\'s Study Timer for 25-minute or 50-minute zero-distraction blocks.';
+        '4. **Deep Focus Blocks**: Use HabbitNova\'s Study Timer for 25-minute or 50-minute zero-distraction blocks.';
   }
 
   static String _createStudyPlan() {
@@ -298,7 +298,7 @@ class AIResponseEngine {
         '• **Block 1 (Morning - 50m)**: Heavy conceptual work & hardest problem sets (high cognitive load).\n'
         '• **Block 2 (Afternoon - 50m)**: Practice questions, flashcards, code exercises.\n'
         '• **Block 3 (Evening - 25m)**: Synthesis review & planning tomorrow\'s top 3 tasks.\n\n'
-        '💡 Add each study block directly into the **Tasks** tab in Synvero to get alarm reminders!';
+        '💡 Add each study block directly into the **Tasks** tab in HabbitNova to get alarm reminders!';
   }
 
   static String _generatePracticeQuestions(String category) {
@@ -326,7 +326,7 @@ class AIResponseEngine {
         '4. **Incline Dumbbell Curls**: 3 sets × 12 reps\n'
         '5. **Tricep Rope Pushdowns**: 3 sets × 12-15 reps\n'
         '6. **Face Pulls (Rear Delts)**: 3 sets × 15 reps\n\n'
-        'Rest 90-120s between compound sets. Log this in Synvero\'s Fitness tab!';
+        'Rest 90-120s between compound sets. Log this in HabbitNova\'s Fitness tab!';
   }
 
   static String _lowerBodyWorkout() {
@@ -397,10 +397,10 @@ class AIResponseEngine {
 
   static String _habitBuildingGuide() {
     return '🔁 **The 4 Laws of Atomic Habit Building (James Clear):**\n\n'
-        '1. **Make it Obvious**: Anchor your new habit to an existing routine (*"After I pour my morning coffee, I will write my 3 tasks in Synvero"*).\n'
+        '1. **Make it Obvious**: Anchor your new habit to an existing routine (*"After I pour my morning coffee, I will write my 3 tasks in HabbitNova"*).\n'
         '2. **Make it Attractive**: Pair what you *need* to do with what you *want* to do.\n'
         '3. **Make it Easy**: Scale the habit down to 2 minutes to start (e.g., read 1 page, do 5 pushups).\n'
-        '4. **Make it Satisfying**: Mark the habit checkmark immediately in Synvero to trigger dopamine!';
+        '4. **Make it Satisfying**: Mark the habit checkmark immediately in HabbitNova to trigger dopamine!';
   }
 
   static String _beatProcrastinationGuide() {
@@ -412,7 +412,7 @@ class AIResponseEngine {
 
   static String _avoidBurnoutGuide() {
     return '🌿 **Preventing Burnout & Mental Fatigue:**\n\n'
-        '• **Brain Offload**: Write down every task floating in your head into the Synvero Tasks tab.\n'
+        '• **Brain Offload**: Write down every task floating in your head into the HabbitNova Tasks tab.\n'
         '• **Protect Boundaries**: Pick a strict shutdown time in the evening where work/study completely stops.\n'
         '• **Sunlight & Nature**: Spend 15 minutes outdoors in the morning to regulate circadian rhythms.\n'
         '• **Micro-resets**: Take 3 slow, deep diaphragmatic breaths (4 seconds in, 6 seconds out).';
@@ -423,16 +423,16 @@ class AIResponseEngine {
         '1. **No Phone for First 30 Mins**: Don\'t start your day reacting to other people\'s agendas.\n'
         '2. **Hydrate**: 500ml water to kickstart metabolism.\n'
         '3. **Light Movement**: 5 minutes of stretching or walking in natural sunlight.\n'
-        '4. **Set Intentions**: Review your top 3 priority tasks in Synvero before starting your day.';
+        '4. **Set Intentions**: Review your top 3 priority tasks in HabbitNova before starting your day.';
   }
 
   static String _generateDynamicAnswer(String prompt, String category) {
-    return '💡 **Synvero AI Insights on "$prompt":**\n\n'
+    return '💡 **HabbitNova AI Insights on "$prompt":**\n\n'
         '1. **Core Concept**:\n'
         '   To master this, break it down into smaller, actionable steps. Consistency in daily action brings real results.\n\n'
         '2. **Recommended Action Steps**:\n'
         '   • Focus on 1 concrete goal related to this today.\n'
-        '   • Use the **Study Timer** in Synvero for a dedicated 25-minute focus session.\n'
+        '   • Use the **Study Timer** in HabbitNova for a dedicated 25-minute focus session.\n'
         '   • Track your progress in the **Tasks** or **Habits** screen.\n\n'
         '3. **Next Step**:\n'
         '   Tell me more about your specific goal or ask any follow-up question, and I\'ll guide you step-by-step!';

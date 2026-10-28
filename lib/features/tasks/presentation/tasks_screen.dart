@@ -185,16 +185,21 @@ class _TasksScreenState extends State<TasksScreen> {
                             final picked = await showTimePicker(
                               context: context,
                               initialTime: selectedTime,
-                              initialEntryMode: TimePickerEntryMode.dial,
+                              initialEntryMode: TimePickerEntryMode.dialOnly,
                               builder: (pickerContext, child) {
-                                return Theme(
-                                  data: Theme.of(pickerContext).copyWith(
-                                    inputDecorationTheme: const InputDecorationTheme(
-                                      contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                                      border: OutlineInputBorder(),
-                                    ),
+                                return MediaQuery(
+                                  data: MediaQuery.of(pickerContext).copyWith(
+                                    viewInsets: EdgeInsets.zero,
                                   ),
-                                  child: child ?? const SizedBox(),
+                                  child: Theme(
+                                    data: Theme.of(pickerContext).copyWith(
+                                      inputDecorationTheme: const InputDecorationTheme(
+                                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                                        border: OutlineInputBorder(),
+                                      ),
+                                    ),
+                                    child: child ?? const SizedBox(),
+                                  ),
                                 );
                               },
                             );

@@ -77,7 +77,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     if (_messages.isEmpty) return;
     final buffer = StringBuffer();
     for (final m in _messages) {
-      buffer.writeln(m.isUser ? '👤 You (${m.time}):' : '🤖 Synvero AI (${m.time}):');
+      buffer.writeln(m.isUser ? '👤 You (${m.time}):' : '🤖 HabbitNova AI (${m.time}):');
       buffer.writeln(m.text);
       buffer.writeln();
     }

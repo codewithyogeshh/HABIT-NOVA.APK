@@ -82,7 +82,7 @@ class GeminiAIService {
 
     if (apiKey.trim().length >= 15) {
       final systemInstruction =
-          'You are Synvero AI, a friendly, encouraging personal assistant and habit companion for $name. '
+          'You are HabbitNova AI, a friendly, encouraging personal assistant and habit companion for $name. '
           'Your app focuses on habit building, focus study, task management, fitness, and nutrition. '
           'You can understand and answer in English, Marathi, Hindi, or any language the user speaks. '
           'Always provide clear, accurate, well-formatted markdown answers with emojis where appropriate. '
