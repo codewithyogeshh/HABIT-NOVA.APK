@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/task_service.dart';
 import 'package:synvero/features/habits/data/habit_repository.dart';
@@ -155,6 +156,8 @@ class _HabitScreenState extends State<HabitScreen> {
         await prefs.setBool('user_${_currentUserId}_habit_${habitId}_completed', newStatus);
       } catch (_) {}
     }
+    // Update live progress on Android Home Widget
+    AppWidgetService.syncWidget();
   }
 
   Future<void> _showAddScheduleDialog() async {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/features/auth/data/auth_repository.dart';
 
@@ -155,6 +156,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _isLoading = false;
         });
       }
+      AppWidgetService.syncWidget();
     }
   }
 
@@ -178,6 +180,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('user_${currentUserId}_habit_${habitId}_completed', newStatus);
       await prefs.setInt('user_${currentUserId}_streak_days', _streakDays);
+      AppWidgetService.syncWidget();
     } catch (_) {}
 
     if (mounted) {

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
@@ -78,6 +79,8 @@ class TaskService {
       final key = '${_userId}_$_storageKey';
       final encoded = jsonEncode(tasks.map((t) => t.toMap()).toList());
       await prefs.setString(key, encoded);
+      // Automatically keep the Android Home Widget in sync with live tasks
+      AppWidgetService.syncWidget();
     } catch (e) {
       debugPrint('Error saving tasks: $e');
     }
