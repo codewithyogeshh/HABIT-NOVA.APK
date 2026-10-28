@@ -1270,7 +1270,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconColor: const Color(0xFF3B66FF),
                       iconBgColor: kIconBgColor,
                       title: 'About App',
-                      onTap: () => _showNotice('Synvero v1.0.0 • Everything Working in Sync.'),
+                      onTap: () => _showNotice('HabbitNova v1.0.0 • Stay Consistent Every Day.'),
                     ),
                   ],
                 ),

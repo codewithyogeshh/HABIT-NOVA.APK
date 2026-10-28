@@ -66,7 +66,7 @@ class SynveroApp extends StatelessWidget {
       valueListenable: ThemeService.themeModeNotifier,
       builder: (context, themeMode, _) {
         return MaterialApp(
-          title: 'Synvero',
+          title: 'HabbitNova',
           theme: buildSynveroTheme(),
           darkTheme: buildSynveroDarkTheme(),
           themeMode: themeMode,

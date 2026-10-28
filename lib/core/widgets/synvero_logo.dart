@@ -124,7 +124,7 @@ class SynveroLogo extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'Synvero',
+          'HabbitNova',
           style: TextStyle(
             color: kDarkText,
             fontSize: titleFontSize,
