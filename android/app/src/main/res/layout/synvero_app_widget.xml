@@ -5,9 +5,9 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="12dp">
 
-    <!-- Header Row -->
+    <!-- Top Header: Logo/Title + Overall % + Streak Badge -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -19,84 +19,228 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="HabbitNova"
+            android:text="✨ HabbitNova"
             android:textColor="#FFFFFF"
-            android:textSize="16sp"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/widget_overall_pct"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:text="0%"
+            android:textColor="#38BDF8"
+            android:textSize="14sp"
             android:textStyle="bold" />
 
         <TextView
             android:id="@+id/widget_streak_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="#26FFFFFF"
+            android:background="@drawable/widget_streak_badge"
             android:paddingStart="8dp"
             android:paddingTop="3dp"
             android:paddingEnd="8dp"
             android:paddingBottom="3dp"
-            android:text="🔥 7-Day Streak"
+            android:text="🔥 0d Streak"
             android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:textStyle="bold" />
     </LinearLayout>
 
-    <ImageView
+    <!-- Overall Progress Mini Bar -->
+    <ProgressBar
+        android:id="@+id/widget_overall_bar"
+        style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
-        android:layout_height="1dp"
-        android:layout_marginTop="8dp"
+        android:layout_height="4dp"
+        android:layout_marginTop="6dp"
         android:layout_marginBottom="8dp"
-        android:background="#20FFFFFF" />
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/progress_overall_glowing" />
 
-    <!-- Progress Row -->
+    <!-- Two Separate Distinct Sections (Habits & Tasks) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:gravity="center_vertical"
         android:orientation="horizontal">
 
+        <!-- SECTION 1: HABITS (Emerald Neon Glow Card) -->
         <LinearLayout
+            android:id="@+id/widget_habits_card"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="match_parent"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/widget_card_habits"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp">
 
-            <TextView
-                android:id="@+id/widget_habits_label"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Today's Habits"
-                android:textColor="#B0C8FE"
-                android:textSize="12sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🎯 HABITS"
+                    android:textColor="#34D399"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_habits_pct"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textColor="#6EE7B7"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/widget_habits_count"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:text="4 of 5 Done"
+                android:text="0 of 5"
                 android:textColor="#FFFFFF"
-                android:textSize="18sp"
+                android:textSize="15sp"
                 android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/widget_habits_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="5dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/progress_habits_glowing" />
         </LinearLayout>
 
-        <TextView
-            android:id="@+id/widget_percentage"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="80%"
-            android:textColor="#34D399"
-            android:textSize="22sp"
-            android:textStyle="bold" />
+        <!-- SECTION 2: TASKS (Purple Neon Glow Card) -->
+        <LinearLayout
+            android:id="@+id/widget_tasks_card"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:background="@drawable/widget_card_tasks"
+            android:orientation="vertical"
+            android:paddingStart="8dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="6dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="📋 TASKS"
+                    android:textColor="#C084FC"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_tasks_pct"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:textColor="#E9D5FF"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/widget_tasks_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="0 of 4"
+                android:textColor="#FFFFFF"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+
+            <ProgressBar
+                android:id="@+id/widget_tasks_bar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="5dp"
+                android:layout_marginTop="4dp"
+                android:max="100"
+                android:progress="0"
+                android:progressDrawable="@drawable/progress_tasks_glowing" />
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Footer Action -->
-    <TextView
-        android:id="@+id/widget_action_text"
+    <!-- Animated Attention-Grabbing Flipper Banner -->
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
-        android:gravity="center"
-        android:text="Tap to log habits &amp; start timer ➔"
-        android:textColor="#B0C8FE"
-        android:textSize="11sp" />
+        android:layout_marginTop="7dp"
+        android:background="@drawable/widget_flipper_bg"
+        android:paddingStart="8dp"
+        android:paddingTop="3dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="3dp">
+
+        <ViewFlipper
+            android:id="@+id/widget_flipper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:autoStart="true"
+            android:flipInterval="3200"
+            android:inAnimation="@android:anim/fade_in"
+            android:outAnimation="@android:anim/fade_out">
+
+            <TextView
+                android:id="@+id/widget_flip_msg1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:singleLine="true"
+                android:text="⚡ Daily Focus: 0 Habits • 0 Tasks Done"
+                android:textColor="#67E8F9"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_flip_msg2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:singleLine="true"
+                android:text="✨ Tap to track progress &amp; stay on top!"
+                android:textColor="#A7F3D0"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_flip_msg3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:singleLine="true"
+                android:text="🔥 Streak Active! Build greatness daily ➔"
+                android:textColor="#FDE047"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+        </ViewFlipper>
+    </FrameLayout>
 </LinearLayout>

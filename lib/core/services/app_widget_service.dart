@@ -69,28 +69,52 @@ class AppWidgetService {
         debugPrint('AppWidgetService habit loading error: $e');
       }
 
-      final total = tasksTotal + habitsTotal;
-      final completed = tasksDone + habitsDone;
-      final pct = total > 0 ? ((completed / total) * 100).round() : 0;
+      final habitsPct = habitsTotal > 0 ? ((habitsDone / habitsTotal) * 100).round() : 0;
+      final tasksPct = tasksTotal > 0 ? ((tasksDone / tasksTotal) * 100).round() : 0;
+      final overallTotal = tasksTotal + habitsTotal;
+      final overallDone = tasksDone + habitsDone;
+      final overallPct = overallTotal > 0 ? ((overallDone / overallTotal) * 100).round() : 0;
 
       final streakBadge = maxStreak > 0
-          ? '🔥 $maxStreak-Day Streak'
-          : (completed > 0 ? '⚡ $completed Done' : '⚡ Get Started');
+          ? '🔥 ${maxStreak}d Streak'
+          : (overallDone > 0 ? '⚡ $overallDone Done' : '⚡ Start Now');
 
-      final label = habitsTotal > 0 && tasksTotal > 0
-          ? "Today's Progress"
-          : (tasksTotal > 0 ? "Today's Tasks" : "Today's Habits");
+      final habitsCountStr = habitsTotal > 0 ? '$habitsDone of $habitsTotal' : 'No habits';
+      final tasksCountStr = tasksTotal > 0 ? '$tasksDone of $tasksTotal' : 'No tasks';
 
-      final countText = total > 0 ? '$completed of $total Done' : 'No items yet';
+      // 3 Dynamic, attention-grabbing rotating messages for the ViewFlipper:
+      final flip1 = '⚡ Daily Focus: $habitsDone/$habitsTotal Habits • $tasksDone/$tasksTotal Tasks';
+      final flip2 = overallPct == 100
+          ? '🏆 All Goals Done! You are extraordinary!'
+          : (overallPct >= 50
+              ? '✨ $overallPct% Done — More than halfway there!'
+              : '🚀 $overallPct% Done — Tap to crush your goals!');
+      final flip3 = maxStreak > 0
+          ? '🔥 Streak: $maxStreak Days Strong! Keep it alive ➔'
+          : '🌟 Consistency builds greatness! Log now ➔';
 
       await _channel.invokeMethod('updateWidgetData', {
-        'title': 'HabbitNova',
+        'title': '✨ HabbitNova',
         'streak': streakBadge,
-        'label': label,
-        'countText': countText,
-        'percentageText': '$pct%',
+        'overallPct': '$overallPct%',
+        'overallTotal': overallTotal,
+        'overallDone': overallDone,
+
+        'habitsCount': habitsCountStr,
+        'habitsPct': '$habitsPct%',
+        'habitsTotal': habitsTotal,
+        'habitsDone': habitsDone,
+
+        'tasksCount': tasksCountStr,
+        'tasksPct': '$tasksPct%',
+        'tasksTotal': tasksTotal,
+        'tasksDone': tasksDone,
+
+        'flip1': flip1,
+        'flip2': flip2,
+        'flip3': flip3,
       });
-      debugPrint('AppWidgetService: synced live progress -> $countText ($pct%)');
+      debugPrint('AppWidgetService: synced live progress -> Habits: $habitsCountStr ($habitsPct%), Tasks: $tasksCountStr ($tasksPct%), Overall: $overallPct%');
     } catch (e) {
       debugPrint('AppWidgetService.syncWidget error: $e');
     }
