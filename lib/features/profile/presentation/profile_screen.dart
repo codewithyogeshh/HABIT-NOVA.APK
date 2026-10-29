@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
+import 'package:synvero/features/profile/presentation/avatar_picker_sheet.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
@@ -1074,10 +1075,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Row(
                   children: [
-                    // Avatar
-                    const UserAvatar(
-                      size: 56,
+                    // Avatar (Tappable to change profile pic)
+                    UserAvatar(
+                      size: 58,
                       showBorder: true,
+                      showEditBadge: true,
+                      onTap: () => AvatarPickerSheet.show(context),
                     ),
                     const SizedBox(width: 14),
 
@@ -1188,6 +1191,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
+                    _buildSettingsTile(
+                      icon: Icons.face_retouching_natural_rounded,
+                      iconColor: const Color(0xFF8B5CF6),
+                      iconBgColor: isDark ? const Color(0xFF2E1065).withValues(alpha: 0.5) : const Color(0xFFF3E8FF),
+                      title: 'Change Profile Avatar',
+                      subtitle: 'Choose Male/Female 3D avatar or photo',
+                      trailingLabel: 'Choose',
+                      onTap: () => AvatarPickerSheet.show(context),
+                    ),
+                    Divider(height: 1, indent: 64, endIndent: 16, color: kDividerColor),
                     _buildSettingsTile(
                       icon: Icons.notifications_none_rounded,
                       iconColor: const Color(0xFF3B66FF),
@@ -1932,13 +1945,47 @@ class _ProfileScreenState extends State<ProfileScreen> {
               color: isDark ? Colors.white : const Color(0xFF0F172A),
             ),
           ),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              hintText: 'Enter your name',
-              border: OutlineInputBorder(),
-            ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Column(
+                  children: [
+                    UserAvatar(
+                      size: 72,
+                      showBorder: true,
+                      showEditBadge: true,
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        AvatarPickerSheet.show(context);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        AvatarPickerSheet.show(context);
+                      },
+                      icon: const Icon(Icons.photo_camera_rounded, size: 16),
+                      label: const Text('Change Avatar (Male/Female)'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF3B66FF),
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  hintText: 'Enter your name',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(

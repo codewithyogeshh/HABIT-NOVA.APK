@@ -17,6 +17,7 @@ import 'package:synvero/features/nutrition/presentation/nutrition_screen.dart';
 import 'package:synvero/core/services/theme_service.dart';
 import 'package:synvero/features/fitness/presentation/fitness_screen.dart';
 import 'package:synvero/core/services/notification_service.dart';
+import 'package:synvero/core/services/avatar_service.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
@@ -36,6 +37,12 @@ void main() async {
     await ThemeService.init();
   } catch (e, st) {
     debugPrint('ThemeService.init error: $e\n$st');
+  }
+
+  try {
+    await AvatarService.init();
+  } catch (e) {
+    debugPrint('AvatarService.init error: ');
   }
 
   try {
