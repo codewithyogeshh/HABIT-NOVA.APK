@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:synvero/core/widgets/user_avatar.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
@@ -1072,34 +1075,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: Row(
                   children: [
                     // Avatar
-                    Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [Color(0xFF3B66FF), Color(0xFF6366F1)],
-                        ),
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF3B66FF).withValues(alpha: 0.25),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          _displayName.isNotEmpty ? _displayName[0].toUpperCase() : 'Y',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
+                    const UserAvatar(
+                      size: 56,
+                      showBorder: true,
                     ),
                     const SizedBox(width: 14),
 
@@ -1262,7 +1240,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconColor: const Color(0xFF3B66FF),
                       iconBgColor: kIconBgColor,
                       title: 'Help & Support',
-                      onTap: () => _showNotice('Support: help@synvero.app'),
+                      subtitle: 'Email & Telegram community',
+                      trailingLabel: 'Contact',
+                      onTap: _showHelpAndSupportSheet,
                     ),
                     Divider(height: 1, indent: 64, endIndent: 16, color: kDividerColor),
                     _buildSettingsTile(
@@ -1270,7 +1250,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       iconColor: const Color(0xFF3B66FF),
                       iconBgColor: kIconBgColor,
                       title: 'About App',
-                      onTap: () => _showNotice('HabbitNova v1.0.0 • Stay Consistent Every Day.'),
+                      subtitle: 'Dev-codewithyogeshh • v1.0.0',
+                      trailingLabel: 'Info',
+                      onTap: _showAboutAppSheet,
                     ),
                   ],
                 ),
@@ -1376,6 +1358,477 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showAboutAppSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+        final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final cardBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.asset(
+                    'assets/icon/app_icon.png',
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(
+                      Icons.spa_rounded,
+                      color: Color(0xFF10B981),
+                      size: 40,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'HabbitNova',
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              Text(
+                'Version 1.0.0 (Build 2026.1)',
+                style: TextStyle(
+                  color: subtextColor,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Small Steps • Big Changes',
+                style: TextStyle(
+                  color: Color(0xFF10B981),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B66FF).withValues(alpha: 0.12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.code_rounded, color: Color(0xFF3B66FF), size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Lead Developer',
+                                style: TextStyle(
+                                  color: subtextColor,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                'Dev-codewithyogeshh',
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+                          ),
+                          child: const Text(
+                            'Creator 🚀',
+                            style: TextStyle(
+                              color: Color(0xFF10B981),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Crafted with passion to help people build unbreakable daily habits, stay focused, and achieve their dreams.',
+                      style: TextStyle(
+                        color: subtextColor,
+                        fontSize: 12.5,
+                        height: 1.4,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.parse('https://github.com/codewithyogeshh/HABIT-NOVA.APK');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                  label: const Text('View Project on GitHub'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B66FF),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showHelpAndSupportSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+        final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final cardBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+
+        const email = 'yogeshchavan2a@gmail.com';
+        const telegramUrl = 'https://t.me/+QRwAMpwUV_swYmM1';
+
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF3B66FF).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.support_agent_rounded, color: Color(0xFF3B66FF), size: 24),
+                  ),
+                  const SizedBox(width: 12),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Help & Support',
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Direct support & community updates',
+                        style: TextStyle(color: subtextColor, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.email_outlined, color: Color(0xFFEF4444), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Support Email',
+                                style: TextStyle(
+                                  color: subtextColor,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  color: textColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(const ClipboardData(text: email));
+                              if (context.mounted) {
+                                _showNotice('Email copied to clipboard! 📋');
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 15),
+                            label: const Text('Copy Email'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF3B66FF),
+                              side: const BorderSide(color: Color(0xFF3B66FF)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final mailto = Uri.parse('mailto:$email?subject=HabbitNova Support');
+                              if (await canLaunchUrl(mailto)) {
+                                await launchUrl(mailto);
+                              } else {
+                                await Clipboard.setData(const ClipboardData(text: email));
+                                if (context.mounted) _showNotice('Email copied: $email');
+                              }
+                            },
+                            icon: const Icon(Icons.send_rounded, size: 15),
+                            label: const Text('Send Email'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF3B66FF),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: cardBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderColor),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0088CC).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.send_rounded, color: Color(0xFF0088CC), size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Official Telegram Channel',
+                                style: TextStyle(
+                                  color: subtextColor,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 1),
+                              const Text(
+                                'HabbitNova Community',
+                                style: TextStyle(
+                                  color: Color(0xFF0088CC),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () async {
+                              await Clipboard.setData(const ClipboardData(text: telegramUrl));
+                              if (context.mounted) {
+                                _showNotice('Telegram link copied! 📋');
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 15),
+                            label: const Text('Copy Link'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFF0088CC),
+                              side: const BorderSide(color: Color(0xFF0088CC)),
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final uri = Uri.parse(telegramUrl);
+                              if (await canLaunchUrl(uri)) {
+                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              } else {
+                                await Clipboard.setData(const ClipboardData(text: telegramUrl));
+                                if (context.mounted) _showNotice('Link copied! Open Telegram to join.');
+                              }
+                            },
+                            icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                            label: const Text('Join Channel'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0088CC),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
     );
   }
 

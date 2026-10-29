@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:synvero/core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
@@ -264,46 +265,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               ],
                             ),
                           ),
-                          InkWell(
+                          UserAvatar(
+                            size: 46,
                             onTap: () {
                               Navigator.of(context).pushNamed('/profile');
                             },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [Color(0xFF3B66FF), Color(0xFF6366F1)],
-                                ),
-                                border: Border.all(
-                                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                                  width: 2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: kPrimaryColor.withValues(alpha: 0.25),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: Text(
-                                  displayName.isNotEmpty
-                                      ? displayName[0].toUpperCase()
-                                      : 'Y',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
                           ),
                         ],
                       ),

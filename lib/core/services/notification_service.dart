@@ -71,8 +71,11 @@ class NotificationService {
 
       await _notificationsPlugin.initialize(
         initSettings,
-        onDidReceiveNotificationResponse: (NotificationResponse response) {
-          debugPrint('Notification clicked: ${response.payload}');
+        onDidReceiveNotificationResponse: (NotificationResponse response) async {
+          debugPrint('Notification clicked/action: ${response.actionId}, payload: ${response.payload}');
+          if (response.id != null) {
+            await cancelTaskAlarms(response.id!);
+          }
         },
       );
 
@@ -227,7 +230,17 @@ class NotificationService {
         vibrationPattern: _alarmVibration,
         fullScreenIntent: true,
         category: AndroidNotificationCategory.alarm,
-        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repeat audio until dismissed
+        ongoing: true,
+        autoCancel: false,
+        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repeat audio until user intervenes
+        actions: const <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'stop_alarm',
+            '🛑 Stop Alarm',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+        ],
       );
 
       final notificationDetails = NotificationDetails(
@@ -336,7 +349,17 @@ class NotificationService {
         vibrationPattern: _alarmVibration,
         fullScreenIntent: true,
         category: AndroidNotificationCategory.alarm,
-        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT
+        ongoing: true,
+        autoCancel: false,
+        additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repeat audio until stopped
+        actions: const <AndroidNotificationAction>[
+          AndroidNotificationAction(
+            'stop_alarm',
+            '🛑 Stop Alarm',
+            showsUserInterface: true,
+            cancelNotification: true,
+          ),
+        ],
       );
 
       final notificationDetails = NotificationDetails(
