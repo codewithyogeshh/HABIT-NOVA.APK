@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
@@ -44,6 +45,29 @@ class NotificationService {
   /// Active alarm notifier. The app listens to this to show the in-app Stop Alarm dialog.
   static final ValueNotifier<ActiveAlarm?> activeAlarmNotifier =
       ValueNotifier<ActiveAlarm?>(null);
+
+  // Native alarm channel for continuous MediaPlayer audio & Vibrator
+  static const MethodChannel _alarmMethodChannel = MethodChannel('com.example.synvero/alarm');
+
+  /// Starts the continuous native alarm audio and vibration loop
+  static Future<void> startNativeAlarm() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _alarmMethodChannel.invokeMethod('startAlarmRing');
+    } catch (e) {
+      debugPrint('startNativeAlarm error: ');
+    }
+  }
+
+  /// Stops the continuous native alarm audio and vibration loop
+  static Future<void> stopNativeAlarm() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      await _alarmMethodChannel.invokeMethod('stopAlarmRing');
+    } catch (e) {
+      debugPrint('stopNativeAlarm error: ');
+    }
+  }
 
 
   // Active in-app timer fallback map to guarantee 0-delay triggers
@@ -94,8 +118,9 @@ class NotificationService {
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) async {
           debugPrint('Notification clicked/action: ${response.actionId}, payload: ${response.payload}');
-          // DO NOT cancel the alarm here! User must enter the app and turn it off inside the app.
+          // DO NOT cancel the alarm here! Touching notification keeps alarm playing!
           if (response.id != null) {
+            await startNativeAlarm();
             activeAlarmNotifier.value = ActiveAlarm(
               id: response.id!,
               title: response.payload?.isNotEmpty == true ? response.payload! : 'Scheduled Task Alarm',
@@ -156,6 +181,7 @@ class NotificationService {
         if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
           final res = launchDetails.notificationResponse;
           if (res != null && res.id != null) {
+            await startNativeAlarm();
             activeAlarmNotifier.value = ActiveAlarm(
               id: res.id!,
               title: res.payload?.isNotEmpty == true
@@ -293,6 +319,7 @@ class NotificationService {
         ),
       );
 
+      await startNativeAlarm();
       activeAlarmNotifier.value = ActiveAlarm(
         id: id,
         title: title,
@@ -525,6 +552,7 @@ class NotificationService {
 
   /// Stops an actively ringing alarm: cancels notification, clears in-app dialog and audio/vibration.
   static Future<void> stopActiveAlarm(int id) async {
+    await stopNativeAlarm();
     await cancelTaskAlarms(id);
     if (activeAlarmNotifier.value?.id == id) {
       activeAlarmNotifier.value = null;

@@ -41,7 +41,8 @@ class _AlarmRingingDialogState extends State<AlarmRingingDialog>
       if (mounted) _updateTimeString();
     });
 
-    // Provide haptic vibration pattern inside the app
+    // Ensure native alarm audio and vibration are actively looping
+    NotificationService.startNativeAlarm();
     HapticFeedback.heavyImpact();
   }
 
