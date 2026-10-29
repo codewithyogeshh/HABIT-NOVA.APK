@@ -30,20 +30,29 @@ class AppWidgetService {
         final currentUserId = SupabaseService.user?.id ?? 'guest';
         final prefs = await SharedPreferences.getInstance();
 
-        // Check if user is logged into Supabase
+        bool loadedFromSupabase = false;
         if (SupabaseService.user != null) {
-          final habitRepo = HabitRepository();
-          final habits = await habitRepo.getHabits();
-          habitsTotal = habits.length;
-          final todayStatus = await habitRepo.getTodaysCompletionStatus();
-          habitsDone = todayStatus.values.where((done) => done).length;
-          for (final h in habits) {
-            try {
-              final s = await habitRepo.calculateStreak(h.id);
-              if (s > maxStreak) maxStreak = s;
-            } catch (_) {}
+          try {
+            final habitRepo = HabitRepository();
+            final habits = await habitRepo.getHabits();
+            if (habits.isNotEmpty) {
+              habitsTotal = habits.length;
+              final todayStatus = await habitRepo.getTodaysCompletionStatus();
+              habitsDone = todayStatus.values.where((done) => done).length;
+              for (final h in habits) {
+                try {
+                  final s = await habitRepo.calculateStreak(h.id);
+                  if (s > maxStreak) maxStreak = s;
+                } catch (_) {}
+              }
+              loadedFromSupabase = true;
+            }
+          } catch (e) {
+            debugPrint('Supabase habits unavailable, falling back to local: $e');
           }
-        } else {
+        }
+
+        if (!loadedFromSupabase) {
           // Local/guest default habits
           final defaultHabitIds = ['def-1', 'def-2', 'def-3', 'def-4', 'def-5'];
           habitsTotal = defaultHabitIds.length;
@@ -53,7 +62,8 @@ class AppWidgetService {
               habitsDone++;
             }
           }
-          maxStreak = habitsDone > 0 ? 1 : 0;
+          final savedStreak = prefs.getInt('user_${currentUserId}_streak_days');
+          maxStreak = savedStreak ?? (habitsDone > 0 ? 1 : 0);
         }
       } catch (e) {
         debugPrint('AppWidgetService habit loading error: $e');
