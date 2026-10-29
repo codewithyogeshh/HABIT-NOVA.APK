@@ -1,3 +1,5 @@
+import 'package:synvero/core/services/supabase_service.dart';
+import 'package:synvero/core/services/quote_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences_android/shared_preferences_android.dart';
@@ -50,6 +52,12 @@ void main() async {
     await NotificationService.init();
   } catch (e, st) {
     debugPrint('NotificationService.init error: $e\n$st');
+  }
+
+  try {
+    QuoteService.init();
+  } catch (e) {
+    debugPrint('QuoteService.init error: $e');
   }
 
   // Initialize Supabase before building the widget tree.
@@ -150,6 +158,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _checkInitialAuth() async {
     try {
       final loggedIn = await _authRepository.isLoggedIn();
+      if (loggedIn) {
+        final user = SupabaseService.user;
+        if (user != null) {
+          await AvatarService.loadForUser(user.id);
+        }
+      } else {
+        AvatarService.resetForLogout();
+      }
       if (mounted) {
         setState(() {
           _isAuthenticated = loggedIn;
@@ -169,6 +185,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Future<void> _handleLogin(String email, String password) async {
     try {
       await _authRepository.signIn(email: email, password: password);
+      final user = SupabaseService.user;
+      if (user != null) {
+        await AvatarService.loadForUser(user.id);
+      }
       setState(() {
         _isAuthenticated = true;
       });

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 
 /// Interactive modal sheet to select male/female preset 3D avatars or upload custom photos.
+/// Includes gender selection and filtered avatar display matching user's account.
 class AvatarPickerSheet extends StatefulWidget {
   const AvatarPickerSheet({super.key});
 
@@ -26,13 +27,20 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
   @override
   void initState() {
     super.initState();
-    // Default to female tab if current avatar is female
-    final isCurrentFemale = AvatarService.currentAvatar.contains('female');
+    final gender = AvatarService.currentGender;
+    final isFemale = gender == 'female' || AvatarService.currentAvatar.contains('female') || AvatarService.currentAvatar.contains('_f');
     _tabController = TabController(
       length: 2,
       vsync: this,
-      initialIndex: isCurrentFemale ? 1 : 0,
+      initialIndex: isFemale ? 1 : 0,
     );
+
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        final newGender = _tabController.index == 1 ? 'female' : 'male';
+        AvatarService.setGender(newGender);
+      }
+    });
   }
 
   @override
@@ -49,6 +57,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
           content: Text('Profile picture updated! ✨'),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF0D9488),
         ),
       );
       Navigator.of(context).pop();
@@ -65,6 +74,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
           content: Text('Custom photo set as profile picture! 📸'),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF0D9488),
         ),
       );
       Navigator.of(context).pop();
@@ -81,6 +91,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
           content: Text('Photo captured and set! 📷'),
           duration: Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
+          backgroundColor: Color(0xFF0D9488),
         ),
       );
       Navigator.of(context).pop();
@@ -90,11 +101,11 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+    final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
     final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    final tabBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final tabBg = isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9);
 
     return Container(
       decoration: BoxDecoration(
@@ -128,7 +139,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
                 height: 44,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF3B66FF), Color(0xFF8B5CF6)],
+                    colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
                   ),
                   borderRadius: BorderRadius.circular(14),
                 ),
@@ -151,7 +162,7 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Select a 3D character (Male / Female) or upload',
+                      'Select gender (Male / Female) to see avatars',
                       style: TextStyle(
                         color: subtextColor,
                         fontSize: 12.5,
@@ -168,11 +179,11 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
 
-          // Tabs (Male / Female)
+          // Gender Tabs (Male / Female)
           Container(
-            height: 44,
+            height: 46,
             decoration: BoxDecoration(
               color: tabBg,
               borderRadius: BorderRadius.circular(14),
@@ -181,11 +192,13 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
             child: TabBar(
               controller: _tabController,
               indicator: BoxDecoration(
-                color: const Color(0xFF3B66FF),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
+                ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF3B66FF).withValues(alpha: 0.3),
+                    color: const Color(0xFF00F0FF).withValues(alpha: 0.25),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -202,9 +215,9 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.male_rounded, size: 18),
+                      Icon(Icons.male_rounded, size: 19),
                       SizedBox(width: 6),
-                      Text('Male Avatars (3)'),
+                      Text('Male Avatars 👨'),
                     ],
                   ),
                 ),
@@ -212,9 +225,9 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.female_rounded, size: 18),
+                      Icon(Icons.female_rounded, size: 19),
                       SizedBox(width: 6),
-                      Text('Female Avatars (3)'),
+                      Text('Female Avatars 👩'),
                     ],
                   ),
                 ),
@@ -250,12 +263,12 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 child: Text(
-                  'OR CUSTOM PHOTO',
+                  'OR UPLOAD OWN PHOTO',
                   style: TextStyle(
                     color: subtextColor,
-                    fontSize: 11,
+                    fontSize: 10.5,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.8,
                   ),
                 ),
               ),
@@ -263,161 +276,168 @@ class _AvatarPickerSheetState extends State<AvatarPickerSheet>
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // Action Buttons: Camera & Gallery
+          // Camera & Gallery Buttons
           Row(
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: _isUploading ? null : _pickFromCamera,
-                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
-                  label: const Text('Take Photo'),
+                  onPressed: _isUploading ? null : _pickFromGallery,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: textColor,
                     side: BorderSide(color: borderColor),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: const Text('Choose Photo'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _isUploading ? null : _pickFromGallery,
-                  icon: const Icon(Icons.photo_library_outlined, size: 18),
-                  label: const Text('Choose Gallery'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF3B66FF),
-                    foregroundColor: Colors.white,
+                child: OutlinedButton.icon(
+                  onPressed: _isUploading ? null : _pickFromCamera,
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: borderColor),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
                   ),
+                  icon: const Icon(Icons.camera_alt_outlined, size: 18),
+                  label: const Text('Take Selfie'),
                 ),
               ),
             ],
           ),
 
-          if (_isUploading) ...[
-            const SizedBox(height: 12),
-            const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildAvatarRow(
-      List<Map<String, String>> avatars, String currentSelectedPath) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: avatars.map((avatar) {
-        final path = avatar['path']!;
-        final name = avatar['name']!;
-        final tag = avatar['tag']!;
-        final isSelected = currentSelectedPath == path;
+  Widget _buildAvatarRow(List<Map<String, String>> avatars, String currentPath) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+
+    return ListView.builder(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      itemCount: avatars.length,
+      itemBuilder: (context, index) {
+        final item = avatars[index];
+        final path = item['path']!;
+        final name = item['name']!;
+        final tag = item['tag']!;
+        final isSelected = currentPath == path;
 
         return GestureDetector(
           onTap: () => _onAvatarSelected(path),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFF10B981)
-                            : Colors.transparent,
-                        width: 3,
+          child: Container(
+            width: 114,
+            margin: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: cardBg,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF00F0FF) : borderColor,
+                width: isSelected ? 2.2 : 1.0,
+              ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF00F0FF).withValues(alpha: 0.35),
+                        blurRadius: 12,
+                        spreadRadius: 1,
                       ),
-                      boxShadow: isSelected
-                          ? [
-                              BoxShadow(
-                                color: const Color(0xFF10B981)
-                                    .withValues(alpha: 0.4),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ]
-                          : null,
-                    ),
-                    child: ClipOval(
-                      child: Image.asset(
-                        path,
-                        width: 76,
-                        height: 76,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                  if (isSelected)
-                    Positioned(
-                      right: 4,
-                      bottom: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
-                          shape: BoxShape.circle,
+                    ]
+                  : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Container(
+                      width: 76,
+                      height: 76,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
                         ),
-                        child: const Icon(
-                          Icons.check_rounded,
-                          color: Colors.white,
-                          size: 14,
+                      ),
+                      child: ClipOval(
+                        child: Image.asset(
+                          path,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => const Icon(
+                            Icons.person,
+                            color: Colors.white,
+                            size: 38,
+                          ),
                         ),
                       ),
                     ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected
-                      ? const Color(0xFF10B981)
-                      : Theme.of(context).textTheme.bodyMedium?.color,
+                    if (isSelected)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF00F0FF),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check_rounded,
+                            color: Color(0xFF030814),
+                            size: 14,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 2),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3B66FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
+                const SizedBox(height: 8),
+                Text(
+                  name,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                    color: isSelected
+                        ? const Color(0xFF00F0FF)
+                        : (isDark ? Colors.white : const Color(0xFF0F172A)),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-                child: Text(
-                  tag,
-                  style: const TextStyle(
-                    fontSize: 9.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF3B66FF),
+                const SizedBox(height: 2),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    tag,
+                    style: const TextStyle(
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF00F0FF),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
-      }).toList(),
+      },
     );
   }
 }
-

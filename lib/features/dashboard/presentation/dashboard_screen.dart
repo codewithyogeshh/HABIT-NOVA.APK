@@ -1,3 +1,7 @@
+import 'package:synvero/core/services/avatar_service.dart';
+import 'package:synvero/core/services/quote_service.dart';
+import 'package:synvero/core/services/streak_badge_service.dart';
+import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -94,6 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final user = SupabaseService.user;
       final currentUserId = user?.id ?? 'guest';
+      await AvatarService.loadForUser(currentUserId);
 
       final prefs = await SharedPreferences.getInstance();
 
@@ -185,13 +190,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     } catch (_) {}
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(newStatus ? '$habitName completed! 🎉' : '$habitName marked pending'),
-          backgroundColor: newStatus ? const Color(0xFF10B981) : const Color(0xFF64748B),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (newStatus) {
+        CelebrationDialog.show(
+          context,
+          title: 'Habit Completed! 🎉',
+          subtitle: habitName,
+          streakDays: _streakDays,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('$habitName marked pending'),
+            backgroundColor: const Color(0xFF64748B),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 
@@ -206,6 +220,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
     final kProgressRingBg = isDark ? const Color(0xFF0A1F30) : const Color(0xFFF1F5F9);
 
+    final streakBadge = StreakBadgeService.getBadge(_streakDays);
     final displayName = _username != null && _username!.isNotEmpty
         ? _capitalize(_username!)
         : 'User';
@@ -260,6 +275,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     color: kSubtextColor,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                                  decoration: BoxDecoration(
+                                    color: streakBadge.color.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: streakBadge.color.withValues(alpha: 0.5), width: 1.0),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(streakBadge.emoji, style: const TextStyle(fontSize: 12)),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        '${streakBadge.title} • ${_streakDays}d Streak',
+                                        style: TextStyle(
+                                          color: streakBadge.color,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
@@ -329,47 +368,84 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Small steps\ncreate big results',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.25,
+                        child: ValueListenableBuilder<MotivationalQuote>(
+                          valueListenable: QuoteService.currentQuoteNotifier,
+                          builder: (context, quote, _) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        'DAILY MOTIVATION ✨',
+                                        style: TextStyle(
+                                          color: Colors.white.withValues(alpha: 0.95),
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Build better habits,\nreach your goals.',
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.85),
-                                      fontSize: 12.5,
-                                      height: 1.3,
+                                    const Spacer(),
+                                    InkWell(
+                                      onTap: () {
+                                        QuoteService.nextQuote();
+                                      },
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              'Next Quote',
+                                              style: TextStyle(
+                                                color: Colors.white.withValues(alpha: 0.95),
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  '"${quote.text}"',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.3,
                                   ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 68,
-                              height: 68,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.18),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.flag_rounded,
-                                color: Colors.white,
-                                size: 36,
-                              ),
-                            ),
-                          ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '— ${quote.author}',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.85),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
 

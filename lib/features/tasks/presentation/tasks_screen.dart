@@ -1,3 +1,4 @@
+import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/notification_service.dart';
@@ -71,8 +72,18 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _toggleTask(TaskItem task) async {
+    final becameCompleted = !task.isCompleted;
     await TaskService.toggleTask(task);
     await _loadTasks();
+    if (becameCompleted && mounted) {
+      final doneCount = _tasks.where((t) => t.isCompleted).length;
+      CelebrationDialog.show(
+        context,
+        title: 'Task Completed! 🚀',
+        subtitle: task.title,
+        streakDays: doneCount,
+      );
+    }
   }
 
   Future<void> _deleteTask(String id) async {

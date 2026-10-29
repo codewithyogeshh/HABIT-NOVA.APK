@@ -1,3 +1,4 @@
+import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
@@ -128,8 +129,12 @@ class _HabitScreenState extends State<HabitScreen> {
   }
 
   Future<void> _toggleCompletion(String habitId, bool isRealDb) async {
+    bool becameCompleted = false;
+    String habitName = 'Habit';
+
     if (isRealDb) {
       final isCurrentlyCompleted = _todayCompletion[habitId] ?? false;
+      becameCompleted = !isCurrentlyCompleted;
       try {
         if (isCurrentlyCompleted) {
           await _repository.uncompleteHabit(habitId, DateTime.now());
@@ -147,6 +152,8 @@ class _HabitScreenState extends State<HabitScreen> {
       // Toggle for default fallback habits
       final habit = _defaultHabits.firstWhere((h) => h['id'] == habitId);
       final newStatus = !(habit['completed'] as bool);
+      becameCompleted = newStatus;
+      habitName = habit['name'] as String? ?? 'Habit';
       setState(() {
         habit['completed'] = newStatus;
         habit['subtitle'] = _getHabitSubtitle(habitId, newStatus);
@@ -156,6 +163,19 @@ class _HabitScreenState extends State<HabitScreen> {
         await prefs.setBool('user_${_currentUserId}_habit_${habitId}_completed', newStatus);
       } catch (_) {}
     }
+
+    if (becameCompleted && mounted) {
+      final doneCount = isRealDb
+          ? _todayCompletion.values.where((v) => v).length
+          : _defaultHabits.where((h) => h['completed'] == true).length;
+      CelebrationDialog.show(
+        context,
+        title: 'Habit Completed! 🎉',
+        subtitle: habitName,
+        streakDays: doneCount > 0 ? 1 : 0,
+      );
+    }
+
     // Update live progress on Android Home Widget
     AppWidgetService.syncWidget();
   }

@@ -119,7 +119,7 @@ class NotificationService {
         onDidReceiveNotificationResponse: (NotificationResponse response) async {
           debugPrint('Notification clicked/action: ${response.actionId}, payload: ${response.payload}');
           // DO NOT cancel the alarm here! Touching notification keeps alarm playing!
-          if (response.id != null) {
+          if (response.id != null && response.id! < 9000) {
             await startNativeAlarm();
             activeAlarmNotifier.value = ActiveAlarm(
               id: response.id!,
@@ -545,6 +545,86 @@ class NotificationService {
       debugPrint('5-Min Advance Reminder scheduled for id: $id at: $tzDateTime');
     } catch (e) {
       debugPrint('Error scheduling 5-min advance reminder: $e');
+    }
+  }
+
+  /// Schedules recurring daily reminders 3 times a day (11:30 AM, 5:30 PM, 9:15 PM)
+  /// to encourage user engagement, habit tracking, and streak maintenance.
+  static Future<void> scheduleDailyHabitReminders() async {
+    if (kIsWeb) return;
+    try {
+      _setupLocalTimezone();
+
+      final reminders = [
+        {
+          'id': 9001,
+          'hour': 11,
+          'minute': 30,
+          'title': '☀️ Midday Habit Check-in!',
+          'body': 'Did you complete your morning habits? Open HabbitNova to check off your progress! 🔥',
+        },
+        {
+          'id': 9002,
+          'hour': 17,
+          'minute': 30,
+          'title': '🎯 Afternoon Task Momentum',
+          'body': "How are today's tasks going? Check off what you completed and finish strong today! 💪",
+        },
+        {
+          'id': 9003,
+          'hour': 21,
+          'minute': 15,
+          'title': '🌙 Evening Streak Saver!',
+          'body': "Don't break your streak! 1 tap to complete today's remaining habits before bed. 🌟",
+        },
+      ];
+
+      for (final r in reminders) {
+        final id = r['id'] as int;
+        final hour = r['hour'] as int;
+        final minute = r['minute'] as int;
+        final title = r['title'] as String;
+        final body = r['body'] as String;
+
+        final now = tz.TZDateTime.now(tz.local);
+        var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+        if (scheduled.isBefore(now)) {
+          scheduled = scheduled.add(const Duration(days: 1));
+        }
+
+        const androidDetails = AndroidNotificationDetails(
+          _reminderChannelId,
+          _reminderChannelName,
+          channelDescription: _reminderChannelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+        );
+
+        const notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        );
+
+        await _notificationsPlugin.zonedSchedule(
+          id,
+          title,
+          body,
+          scheduled,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
+      debugPrint('Daily 3x habit reminders successfully scheduled!');
+    } catch (e) {
+      debugPrint('Error scheduling daily habit reminders: $e');
     }
   }
 

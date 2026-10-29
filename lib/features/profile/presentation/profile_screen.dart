@@ -1,3 +1,6 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synvero/core/services/streak_badge_service.dart';
+import 'package:synvero/core/services/avatar_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -42,6 +45,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _notifTimer = true;
   bool _notifNutrition = true;
   bool _notifTasks = true;
+  int _streakDays = 0;
+  String _selectedGender = 'male';
 
   @override
   void initState() {
@@ -50,9 +55,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadNotifPrefs();
   }
 
-  void _loadUserInfo() {
+  Future<void> _loadUserInfo() async {
     try {
       final user = SupabaseService.user;
+      final currentUserId = user?.id ?? 'guest';
+      await AvatarService.loadForUser(currentUserId);
+      final prefs = await SharedPreferences.getInstance();
+      final streak = prefs.getInt('user_${currentUserId}_streak_days') ?? 0;
+      final gender = AvatarService.currentGender;
+
       if (user != null) {
         final metaUsername = user.userMetadata?['username'] as String?;
         if (metaUsername != null && metaUsername.isNotEmpty) {
@@ -63,6 +74,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (user.email != null && user.email!.isNotEmpty) {
           _displayEmail = user.email!;
         }
+      }
+
+      if (mounted) {
+        setState(() {
+          _streakDays = streak;
+          _selectedGender = gender;
+        });
       }
     } catch (_) {}
   }
@@ -112,6 +130,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _isLoggingOut = true;
     });
     try {
+      AvatarService.resetForLogout();
       await _authRepository.signOut();
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
@@ -121,6 +140,364 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     }
+  }
+
+
+  void _showGenderSelectionSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
+    final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.wc_rounded, color: Colors.white, size: 22),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Select Your Gender / लिंग निवडा',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          'Avatars will match your selected gender',
+                          style: TextStyle(color: subtextColor, fontSize: 12.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        Navigator.of(ctx).pop();
+                        await AvatarService.setGender('male');
+                        setState(() {
+                          _selectedGender = 'male';
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Gender set to Male 👨! Choose your 3D avatar.'),
+                              backgroundColor: Color(0xFF0284C7),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          AvatarPickerSheet.show(context);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        decoration: BoxDecoration(
+                          color: _selectedGender == 'male'
+                              ? const Color(0xFF0284C7).withValues(alpha: 0.18)
+                              : (isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _selectedGender == 'male'
+                                ? const Color(0xFF00F0FF)
+                                : borderColor,
+                            width: _selectedGender == 'male' ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('👨', style: TextStyle(fontSize: 42)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Male (पुरुष)',
+                              style: TextStyle(
+                                color: _selectedGender == 'male' ? const Color(0xFF00F0FF) : textColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '3D Male Avatars',
+                              style: TextStyle(color: subtextColor, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () async {
+                        Navigator.of(ctx).pop();
+                        await AvatarService.setGender('female');
+                        setState(() {
+                          _selectedGender = 'female';
+                        });
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Gender set to Female 👩! Choose your 3D avatar.'),
+                              backgroundColor: Color(0xFF0D9488),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                          AvatarPickerSheet.show(context);
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 20),
+                        decoration: BoxDecoration(
+                          color: _selectedGender == 'female'
+                              ? const Color(0xFF0D9488).withValues(alpha: 0.18)
+                              : (isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: _selectedGender == 'female'
+                                ? const Color(0xFF00F0FF)
+                                : borderColor,
+                            width: _selectedGender == 'female' ? 2 : 1,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            const Text('👩', style: TextStyle(fontSize: 42)),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Female (स्त्री)',
+                              style: TextStyle(
+                                color: _selectedGender == 'female' ? const Color(0xFF00F0FF) : textColor,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '3D Female Avatars',
+                              style: TextStyle(color: subtextColor, fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showStreakMilestonesSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
+    final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final currentBadge = StreakBadgeService.getBadge(_streakDays);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.82,
+          ),
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4.5,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
+                      ),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Icon(Icons.military_tech_rounded, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Discipline Ranks & Badges',
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          'Keep your streak alive to unlock higher ranks!',
+                          style: TextStyle(color: subtextColor, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: Icon(Icons.close_rounded, color: subtextColor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: StreakBadgeService.allTiers.length,
+                  itemBuilder: (context, index) {
+                    final tier = StreakBadgeService.allTiers[index];
+                    final isUnlocked = _streakDays >= tier.minDays;
+                    final isCurrent = currentBadge.title == tier.title;
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: isCurrent
+                            ? tier.color.withValues(alpha: 0.15)
+                            : (isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC)),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isCurrent ? tier.color : (isUnlocked ? borderColor : borderColor.withValues(alpha: 0.4)),
+                          width: isCurrent ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Text(tier.emoji, style: const TextStyle(fontSize: 28)),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      tier.title,
+                                      style: TextStyle(
+                                        color: isUnlocked ? tier.color : subtextColor,
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    if (isCurrent) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: tier.color,
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: const Text(
+                                          'ACTIVE',
+                                          style: TextStyle(
+                                            color: Color(0xFF030814),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  tier.description,
+                                  style: TextStyle(
+                                    color: subtextColor,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            isUnlocked ? Icons.check_circle_rounded : Icons.lock_outline_rounded,
+                            color: isUnlocked ? tier.color : subtextColor.withValues(alpha: 0.4),
+                            size: 20,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void _onBottomNavTapped(int index) {
@@ -1106,6 +1483,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               fontWeight: FontWeight.w400,
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          Builder(
+                            builder: (context) {
+                              final streakBadge = StreakBadgeService.getBadge(_streakDays);
+                              return InkWell(
+                                onTap: _showStreakMilestonesSheet,
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: streakBadge.color.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: streakBadge.color.withValues(alpha: 0.5), width: 1.0),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(streakBadge.emoji, style: const TextStyle(fontSize: 12)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '${streakBadge.title} • ${_streakDays}d Streak',
+                                        style: TextStyle(
+                                          color: streakBadge.color,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(Icons.chevron_right_rounded, size: 12, color: streakBadge.color),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -1191,6 +1603,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 child: Column(
                   children: [
+                    _buildSettingsTile(
+                      icon: Icons.wc_rounded,
+                      iconColor: const Color(0xFF00F0FF),
+                      iconBgColor: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE0F2FE),
+                      title: 'Gender (लिंग निवडा)',
+                      subtitle: 'Selected: ${_selectedGender == 'female' ? 'Female 👩' : 'Male 👨'} • Tap to switch',
+                      trailingLabel: _selectedGender == 'female' ? 'Female 👩' : 'Male 👨',
+                      onTap: _showGenderSelectionSheet,
+                    ),
+                    Divider(height: 1, indent: 64, endIndent: 16, color: kDividerColor),
                     _buildSettingsTile(
                       icon: Icons.face_retouching_natural_rounded,
                       iconColor: const Color(0xFF8B5CF6),
