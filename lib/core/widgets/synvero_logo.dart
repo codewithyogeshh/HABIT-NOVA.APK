@@ -118,9 +118,30 @@ class SynveroLogo extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: alignment,
       children: [
-        CustomPaint(
-          size: Size(iconSize, iconSize),
-          painter: SynveroIconPainter(color: brandColor),
+        Container(
+          width: iconSize,
+          height: iconSize,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(iconSize * 0.26),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withValues(alpha: 0.35),
+                blurRadius: iconSize * 0.3,
+                offset: Offset(0, iconSize * 0.08),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(iconSize * 0.26),
+            child: Image.asset(
+              'assets/icon/app_icon.png',
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => CustomPaint(
+                size: Size(iconSize, iconSize),
+                painter: SynveroIconPainter(color: brandColor),
+              ),
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -136,7 +157,7 @@ class SynveroLogo extends StatelessWidget {
         if (showTagline) ...[
           const SizedBox(height: 4),
           Text(
-            'Everything Working in Sync.',
+            'Small Steps • Big Changes',
             style: TextStyle(
               color: kSecondaryText,
               fontSize: taglineFontSize,

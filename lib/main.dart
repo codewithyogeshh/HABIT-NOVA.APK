@@ -17,6 +17,7 @@ import 'package:synvero/features/nutrition/presentation/nutrition_screen.dart';
 import 'package:synvero/core/services/theme_service.dart';
 import 'package:synvero/features/fitness/presentation/fitness_screen.dart';
 import 'package:synvero/core/services/notification_service.dart';
+import 'package:synvero/core/widgets/alarm_ringing_dialog.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 
 void main() async {
@@ -64,8 +65,36 @@ void main() async {
   runApp(const SynveroApp());
 }
 
-class SynveroApp extends StatelessWidget {
+class SynveroApp extends StatefulWidget {
   const SynveroApp({super.key});
+
+  @override
+  State<SynveroApp> createState() => _SynveroAppState();
+}
+
+class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Request exact alarm and notification permissions
+    NotificationService.requestPermissions();
+    // Check if an alarm is already ringing in background
+    NotificationService.checkForActiveAlarms();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      NotificationService.checkForActiveAlarms();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +108,20 @@ class SynveroApp extends StatelessWidget {
           themeMode: themeMode,
           home: const AuthWrapper(),
           debugShowCheckedModeBanner: false,
+          builder: (context, child) {
+            return ValueListenableBuilder<ActiveAlarm?>(
+              valueListenable: NotificationService.activeAlarmNotifier,
+              builder: (context, activeAlarm, _) {
+                return Stack(
+                  children: [
+                    ?child,
+                    if (activeAlarm != null)
+                      AlarmRingingDialog(alarm: activeAlarm),
+                  ],
+                );
+              },
+            );
+          },
         );
       },
     );

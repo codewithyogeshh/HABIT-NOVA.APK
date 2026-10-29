@@ -93,11 +93,23 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          if (e is AuthException) {
+          final raw = e.toString().toLowerCase();
+          if (raw.contains('invalid login credentials') ||
+              raw.contains('invalid_credentials') ||
+              raw.contains('invalid email or password')) {
+            _errorMessage = 'Invalid email or password.\nIf you don\'t have an account yet, please register first then log in.';
+          } else if (raw.contains('user not found') || raw.contains('user_not_found')) {
+            _errorMessage = 'No account found with this email. Please register first then log in.';
+          } else if (raw.contains('invalid email') || raw.contains('invalid_email')) {
+            _errorMessage = 'Invalid email address. Please check your email or register first.';
+          } else if (raw.contains('email not confirmed')) {
+            _errorMessage = 'Please confirm your email address before signing in.';
+          } else if (raw.contains('rate limit')) {
+            _errorMessage = 'Too many attempts. Please try again in a few moments.';
+          } else if (e is AuthException) {
             _errorMessage = e.message;
           } else {
-            final raw = e.toString();
-            final clean = raw
+            final clean = e.toString()
                 .replaceAll('AuthException: ', '')
                 .replaceAll('AuthApiException: ', '')
                 .replaceAll('Exception: ', '')
@@ -319,31 +331,74 @@ class _LoginScreenState extends State<LoginScreen> {
                         // Error message
                         if (_errorMessage != null) ...[
                           Container(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: kErrorColor.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: kErrorColor.withValues(alpha: 0.3),
+                                color: kErrorColor.withValues(alpha: 0.35),
                               ),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Icon(
-                                  Icons.error_outline_rounded,
-                                  color: kErrorColor,
-                                  size: 18,
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Padding(
+                                      padding: EdgeInsets.only(top: 1),
+                                      child: Icon(
+                                        Icons.error_outline_rounded,
+                                        color: kErrorColor,
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        _errorMessage!,
+                                        style: const TextStyle(
+                                          color: kErrorColor,
+                                          fontSize: 13,
+                                          height: 1.35,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _errorMessage!,
-                                    style: const TextStyle(
-                                      color: kErrorColor,
-                                      fontSize: 13,
+                                if (_errorMessage!.toLowerCase().contains('register')) ...[
+                                  const SizedBox(height: 10),
+                                  InkWell(
+                                    onTap: () {
+                                      Navigator.of(context).pushNamed('/signup');
+                                    },
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: kPrimaryColor.withValues(alpha: 0.12),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: kPrimaryColor.withValues(alpha: 0.4)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '👉 Register new account now',
+                                            style: TextStyle(
+                                              color: kPrimaryColor,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Icon(Icons.arrow_forward_rounded, size: 13, color: kPrimaryColor),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ],
                               ],
                             ),
                           ),

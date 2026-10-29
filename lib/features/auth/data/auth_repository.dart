@@ -150,7 +150,7 @@ class AuthRepository {
     } else if (code == 'user_already_exists' || rawMessage.contains('already registered')) {
       message = 'An account with this email already exists. Please log in.';
     } else if (code == 'invalid_credentials' || rawMessage.contains('invalid login credentials')) {
-      message = 'Invalid email or password. Please try again.';
+      message = 'Invalid email or password. If you don\'t have an account, please register first then log in.';
     } else if (code == 'email_not_confirmed' || rawMessage.contains('email not confirmed')) {
       message = 'Please confirm your email address before signing in.';
     } else if (code == 'weak_password') {

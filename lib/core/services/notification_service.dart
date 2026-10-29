@@ -1,3 +1,4 @@
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -5,6 +6,22 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+
+/// Represents an alarm that is currently ringing.
+class ActiveAlarm {
+  final int id;
+  final String title;
+  final String body;
+  final DateTime time;
+
+  ActiveAlarm({
+    required this.id,
+    required this.title,
+    required this.body,
+    required this.time,
+  });
+}
+
 
 /// Service for managing local push notifications, exact alarm clocks, and reminders.
 class NotificationService {
@@ -24,6 +41,10 @@ class NotificationService {
       'Advance reminder notifications 5 minutes before scheduled task time';
 
   static bool _isInitialized = false;
+  /// Active alarm notifier. The app listens to this to show the in-app Stop Alarm dialog.
+  static final ValueNotifier<ActiveAlarm?> activeAlarmNotifier =
+      ValueNotifier<ActiveAlarm?>(null);
+
 
   // Active in-app timer fallback map to guarantee 0-delay triggers
   static final Map<int, Timer> _activeTimers = {};
@@ -73,8 +94,14 @@ class NotificationService {
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) async {
           debugPrint('Notification clicked/action: ${response.actionId}, payload: ${response.payload}');
+          // DO NOT cancel the alarm here! User must enter the app and turn it off inside the app.
           if (response.id != null) {
-            await cancelTaskAlarms(response.id!);
+            activeAlarmNotifier.value = ActiveAlarm(
+              id: response.id!,
+              title: response.payload?.isNotEmpty == true ? response.payload! : 'Scheduled Task Alarm',
+              body: 'Time for your scheduled task!',
+              time: DateTime.now(),
+            );
           }
         },
       );
@@ -121,6 +148,27 @@ class NotificationService {
 
       _isInitialized = true;
       debugPrint('NotificationService initialized with Timezone & Dual Channels.');
+
+      // Check if app was opened from an active alarm notification
+      try {
+        final launchDetails =
+            await _notificationsPlugin.getNotificationAppLaunchDetails();
+        if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
+          final res = launchDetails.notificationResponse;
+          if (res != null && res.id != null) {
+            activeAlarmNotifier.value = ActiveAlarm(
+              id: res.id!,
+              title: res.payload?.isNotEmpty == true
+                  ? res.payload!
+                  : 'Scheduled Task Alarm',
+              body: 'Time for your scheduled task!',
+              time: DateTime.now(),
+            );
+          }
+        }
+      } catch (e) {
+        debugPrint('Error checking launch details: $e');
+      }
     } catch (e) {
       debugPrint('Error initializing NotificationService: $e');
     }
@@ -233,14 +281,7 @@ class NotificationService {
         ongoing: true,
         autoCancel: false,
         additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repeat audio until user intervenes
-        actions: const <AndroidNotificationAction>[
-          AndroidNotificationAction(
-            'stop_alarm',
-            '🛑 Stop Alarm',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-        ],
+
       );
 
       final notificationDetails = NotificationDetails(
@@ -252,6 +293,12 @@ class NotificationService {
         ),
       );
 
+      activeAlarmNotifier.value = ActiveAlarm(
+        id: id,
+        title: title,
+        body: body,
+        time: DateTime.now(),
+      );
       await _notificationsPlugin.show(
         id,
         title,
@@ -352,14 +399,7 @@ class NotificationService {
         ongoing: true,
         autoCancel: false,
         additionalFlags: Int32List.fromList([4]), // FLAG_INSISTENT: repeat audio until stopped
-        actions: const <AndroidNotificationAction>[
-          AndroidNotificationAction(
-            'stop_alarm',
-            '🛑 Stop Alarm',
-            showsUserInterface: true,
-            cancelNotification: true,
-          ),
-        ],
+
       );
 
       final notificationDetails = NotificationDetails(
@@ -482,6 +522,40 @@ class NotificationService {
   }
 
   /// Cancels all alarms and reminders associated with a task ID.
+
+  /// Stops an actively ringing alarm: cancels notification, clears in-app dialog and audio/vibration.
+  static Future<void> stopActiveAlarm(int id) async {
+    await cancelTaskAlarms(id);
+    if (activeAlarmNotifier.value?.id == id) {
+      activeAlarmNotifier.value = null;
+    }
+  }
+
+  /// Checks OS active notifications and triggers in-app alarm dialog if an alarm is ringing.
+  static Future<void> checkForActiveAlarms() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      final android = _notificationsPlugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      final activeNotifs = await android?.getActiveNotifications();
+      if (activeNotifs != null && activeNotifs.isNotEmpty) {
+        for (final notif in activeNotifs) {
+          if (notif.channelId == _alarmChannelId && notif.id != null) {
+            activeAlarmNotifier.value = ActiveAlarm(
+              id: notif.id!,
+              title: notif.title ?? 'Task Alarm',
+              body: notif.body ?? 'Time for your scheduled task!',
+              time: DateTime.now(),
+            );
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('checkForActiveAlarms error: $e');
+    }
+  }
+
   static Future<void> cancelTaskAlarms(int id) async {
     try {
       _activeTimers[id]?.cancel();
