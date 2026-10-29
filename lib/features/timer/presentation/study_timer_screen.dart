@@ -244,9 +244,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF141E33),
+                        color: const Color(0xFF071728),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF1E2D48)),
+                        border: Border.all(color: const Color(0xFF0E3D48)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -306,7 +306,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: const Color(0xFF00E5FF),
-                        inactiveTrackColor: const Color(0xFF1E2D48),
+                        inactiveTrackColor: const Color(0xFF0E3D48),
                         thumbColor: const Color(0xFF00E5FF),
                         overlayColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
                         trackHeight: 6,
@@ -343,14 +343,14 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                           label: Text('$mins min'),
                           selected: isSelected,
                           selectedColor: const Color(0xFF00E5FF),
-                          backgroundColor: const Color(0xFF141E33),
+                          backgroundColor: const Color(0xFF071728),
                           labelStyle: TextStyle(
                             color: isSelected ? const Color(0xFF0A1124) : Colors.white,
                             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                             fontSize: 12.5,
                           ),
                           side: BorderSide(
-                            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF1E2D48),
+                            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF0E3D48),
                           ),
                           onSelected: (selected) {
                             if (selected) {
@@ -424,7 +424,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
     final progress = _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0.0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF090E1A),
+      backgroundColor: const Color(0xFF030814),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -465,7 +465,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF141C2E),
+                  color: const Color(0xFF071728),
                   borderRadius: BorderRadius.circular(24),
                 ),
                 child: Row(
@@ -507,12 +507,12 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                               decoration: BoxDecoration(
                                 color: isSelected
                                     ? const Color(0xFF00E5FF).withValues(alpha: 0.2)
-                                    : const Color(0xFF141C2E),
+                                    : const Color(0xFF071728),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
                                   color: isSelected
                                       ? const Color(0xFF00E5FF)
-                                      : const Color(0xFF1E2D48),
+                                      : const Color(0xFF0E3D48),
                                 ),
                               ),
                               child: Text(
@@ -534,9 +534,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF141C2E),
+                            color: const Color(0xFF071728),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFF2A3854)),
+                            border: Border.all(color: const Color(0xFF0E3D48)),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -748,9 +748,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF101728),
+                  color: const Color(0xFF071728),
                   borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFF1E2D48)),
+                  border: Border.all(color: const Color(0xFF0E3D48)),
                 ),
                 child: Row(
                   children: [
@@ -780,7 +780,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                     Container(
                       width: 1,
                       height: 36,
-                      color: const Color(0xFF1E2D48),
+                      color: const Color(0xFF0E3D48),
                     ),
                     const SizedBox(width: 20),
                     Expanded(
@@ -837,7 +837,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
             }
           },
           type: BottomNavigationBarType.fixed,
-          backgroundColor: const Color(0xFF0D1424),
+          backgroundColor: const Color(0xFF050E1A),
           selectedItemColor: const Color(0xFF00E5FF),
           unselectedItemColor: const Color(0xFF64748B),
           selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),

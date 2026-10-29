@@ -198,13 +198,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final kBgColor = isDark ? const Color(0xFF0A0F1D) : const Color(0xFFF8FAFC);
-    final kCardBg = isDark ? const Color(0xFF131D31) : Colors.white;
+    final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
+    final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    final kBottomNavBg = isDark ? const Color(0xFF0D1424) : Colors.white;
-    final kProgressRingBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
+    final kProgressRingBg = isDark ? const Color(0xFF0A1F30) : const Color(0xFFF1F5F9);
 
     final displayName = _username != null && _username!.isNotEmpty
         ? _capitalize(_username!)
@@ -316,14 +316,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF3B66FF),
-                              Color(0xFF2563EB),
+                              Color(0xFF0284C7),
+                              Color(0xFF0D9488),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                              color: const Color(0xFF0284C7).withValues(alpha: 0.3),
                               blurRadius: 16,
                               offset: const Offset(0, 8),
                             ),
@@ -411,7 +411,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                       strokeWidth: 9,
                                       backgroundColor: kProgressRingBg,
                                       valueColor: const AlwaysStoppedAnimation(
-                                        Color(0xFF10B981),
+                                        Color(0xFF00E5FF),
                                       ),
                                     ),
                                   ),
@@ -667,24 +667,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                     ),
                                   ),
                                   // Interactive Checkbox
-                                  Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: BoxDecoration(
-                                      color: isDone ? const Color(0xFF10B981) : Colors.transparent,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: isDone ? const Color(0xFF10B981) : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: isDone
-                                        ? const Icon(
-                                            Icons.check_rounded,
-                                            color: Colors.white,
-                                            size: 16,
-                                          )
-                                        : null,
+                                  Icon(
+                                    isDone
+                                        ? Icons.check_circle_rounded
+                                        : Icons.radio_button_unchecked_rounded,
+                                    color: isDone
+                                        ? const Color(0xFF00E5FF)
+                                        : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFCBD5E1)),
+                                    size: 26,
                                   ),
                                 ],
                               ),
@@ -967,9 +957,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF131D31) : bgColor,
+              color: isDark ? const Color(0xFF071728) : bgColor,
               borderRadius: BorderRadius.circular(18),
-              border: isDark ? Border.all(color: const Color(0xFF1E293B)) : null,
+              border: Border.all(color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
             ),
             child: Icon(icon, color: color, size: 28),
           ),

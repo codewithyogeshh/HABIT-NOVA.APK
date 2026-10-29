@@ -154,10 +154,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         return StatefulBuilder(
           builder: (modalContext, setSheetState) {
             final isDark = Theme.of(ctx).brightness == Brightness.dark;
-            final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+            final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
             final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
             final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-            final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+            final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
 
             return FutureBuilder<String>(
               future: NotificationService.getPermissionStatus(),
@@ -408,7 +408,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final cardBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
-    final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -468,10 +468,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isScrollControlled: true,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
         final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
         final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
 
         return Container(
           decoration: BoxDecoration(
@@ -741,7 +741,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -800,10 +800,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isScrollControlled: true,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
         final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
         final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
 
         return StatefulBuilder(
           builder: (modalContext, setSheetState) {
@@ -934,7 +934,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         : (isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC));
     final borderColor = isSelected
         ? const Color(0xFF3B66FF)
-        : (isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0));
+        : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0));
     final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
@@ -1004,12 +1004,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final kBgColor = isDark ? const Color(0xFF0A0F1D) : const Color(0xFFF8FAFC);
-    final kCardBg = isDark ? const Color(0xFF131D31) : Colors.white;
+    final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
+    final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
     final kDarkNavy = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSecondaryText = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    final kDividerColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9);
+    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final kDividerColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFF1F5F9);
     final kIconBgColor = isDark ? const Color(0xFF1E2D48) : const Color(0xFFEFF6FF);
     final kBottomNavBg = isDark ? const Color(0xFF0D1424) : Colors.white;
 
@@ -1381,10 +1381,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isScrollControlled: true,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
         final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
         final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
         final cardBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
         return Container(
@@ -1577,10 +1577,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       isScrollControlled: true,
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        final sheetBg = isDark ? const Color(0xFF131D31) : Colors.white;
+        final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
         final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
         final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-        final borderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+        final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
         final cardBg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
 
         const email = 'yogeshchavan2a@gmail.com';
@@ -1935,7 +1935,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       builder: (ctx) {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return AlertDialog(
-          backgroundColor: isDark ? const Color(0xFF131D31) : Colors.white,
+          backgroundColor: isDark ? const Color(0xFF071728) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: Text(
             'Edit Profile',

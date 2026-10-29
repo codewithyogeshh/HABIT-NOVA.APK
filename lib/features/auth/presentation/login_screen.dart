@@ -129,8 +129,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final kBgColor = isDark ? const Color(0xFF030814) : kMainBackground;
+    final kFieldFill = isDark ? const Color(0xFF071728) : kInputBackground;
+    final kFieldBorder = isDark ? const Color(0xFF0E3D48) : kBorderColor;
+    final kHeadingColor = isDark ? const Color(0xFFF1F5F9) : kDarkText;
+    final kSubtitleColor = isDark ? const Color(0xFF94A3B8) : kSecondaryText;
+
     return Scaffold(
-      backgroundColor: kMainBackground,
+      backgroundColor: kBgColor,
       body: Stack(
         children: [
           // Mountain landscape illustration at the bottom
@@ -156,30 +163,46 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         const SizedBox(height: 16),
 
-                        // Synvero Brand Logo (Emblem + Name + Tagline)
-                        const SynveroLogo(
-                          iconSize: 48,
-                          titleFontSize: 26,
-                          taglineFontSize: 13,
+                        // Synvero Brand Logo with Bioluminescent Aura
+                        Center(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: isDark
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                                        blurRadius: 70,
+                                        spreadRadius: 20,
+                                      ),
+                                    ]
+                                  : null,
+                            ),
+                            child: const SynveroLogo(
+                              iconSize: 56,
+                              titleFontSize: 26,
+                              taglineFontSize: 13,
+                            ),
+                          ),
                         ),
 
                         const SizedBox(height: 36),
 
                         // Section Heading
-                        const Text(
+                        Text(
                           'Welcome Back',
                           style: TextStyle(
-                            color: kDarkText,
+                            color: kHeadingColor,
                             fontSize: 22,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           'Log in to continue your journey.',
                           style: TextStyle(
-                            color: kSecondaryText,
+                            color: kSubtitleColor,
                             fontSize: 14,
                             fontWeight: FontWeight.w400,
                           ),
@@ -188,10 +211,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 28),
 
                         // Email Address Field
-                        const Text(
+                        Text(
                           'Email address',
                           style: TextStyle(
-                            color: kDarkText,
+                            color: kHeadingColor,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -210,25 +233,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: kSecondaryText,
                             ),
                             filled: true,
-                            fillColor: kInputBackground,
+                            fillColor: kFieldFill,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 14,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: kBorderColor),
+                              borderSide: BorderSide(color: kFieldBorder),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: kBorderColor),
+                              borderSide: BorderSide(color: kFieldBorder),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: kPrimaryColor,
-                                width: 1.5,
-                              ),
+                              borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                             ),
                           ),
                           validator: _validateEmail,
@@ -237,10 +257,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 18),
 
                         // Password Field
-                        const Text(
+                        Text(
                           'Password',
                           style: TextStyle(
-                            color: kDarkText,
+                            color: kHeadingColor,
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
@@ -274,25 +294,22 @@ class _LoginScreenState extends State<LoginScreen> {
                               },
                             ),
                             filled: true,
-                            fillColor: kInputBackground,
+                            fillColor: kFieldFill,
                             contentPadding: const EdgeInsets.symmetric(
                               horizontal: 16,
                               vertical: 14,
                             ),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: kBorderColor),
+                              borderSide: BorderSide(color: kFieldBorder),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(color: kBorderColor),
+                              borderSide: BorderSide(color: kFieldBorder),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
-                              borderSide: const BorderSide(
-                                color: kPrimaryColor,
-                                width: 1.5,
-                              ),
+                              borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                             ),
                           ),
                           validator: _validatePassword,
@@ -312,12 +329,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               );
                             },
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Text(
                                 'Forgot Password?',
                                 style: TextStyle(
-                                  color: kPrimaryColor,
+                                  color: isDark ? const Color(0xFF0284C7) : kPrimaryColor,
                                   fontSize: 13,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -460,10 +477,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           alignment: WrapAlignment.center,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            const Text(
+                            Text(
                               "Don't have an account? ",
                               style: TextStyle(
-                                color: kSecondaryText,
+                                color: kSubtitleColor,
                                 fontSize: 14,
                               ),
                             ),

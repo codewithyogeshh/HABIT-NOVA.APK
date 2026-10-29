@@ -428,12 +428,12 @@ class _HabitScreenState extends State<HabitScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final kBgColor = isDark ? const Color(0xFF0A0F1D) : const Color(0xFFF8FAFC);
-    final kCardBg = isDark ? const Color(0xFF131D31) : Colors.white;
+    final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
+    final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-    final kBottomNavBg = isDark ? const Color(0xFF0D1424) : Colors.white;
+    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
 
     return Scaffold(
       backgroundColor: kBgColor,
@@ -779,7 +779,7 @@ class _HabitScreenState extends State<HabitScreen> {
                       Text(
                         displaySubtitle,
                         style: TextStyle(
-                          color: isCompleted ? const Color(0xFF10B981) : subtextColor,
+                          color: isCompleted ? (isDark ? const Color(0xFF00E5FF) : const Color(0xFF10B981)) : subtextColor,
                           fontSize: 12,
                           fontWeight: isCompleted ? FontWeight.w500 : FontWeight.w400,
                         ),

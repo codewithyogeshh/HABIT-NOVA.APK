@@ -139,10 +139,10 @@ ThemeData buildSynveroTheme() {
 
 /// Builds the Synvero dark theme data.
 ThemeData buildSynveroDarkTheme() {
-  const kDarkBg = Color(0xFF0A0F1D);
-  const kDarkSurface = Color(0xFF131D31);
-  const kDarkBorder = Color(0xFF1E293B);
-  const kDarkInput = Color(0xFF162035);
+  const kDarkBg = Color(0xFF030814);
+  const kDarkSurface = Color(0xFF071728);
+  const kDarkBorder = Color(0xFF0E3D48);
+  const kDarkInput = Color(0xFF071728);
   const kLightText = Color(0xFFF8FAFC);
   const kMutedText = Color(0xFF94A3B8);
 

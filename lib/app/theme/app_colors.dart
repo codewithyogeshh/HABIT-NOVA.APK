@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Primary brand color: #2F65F6 (Vibrant Synvero Blue)
-const Color kPrimaryColor = Color(0xFF2F65F6);
+/// Primary brand color: #0284C7 (Vibrant Cyan-Blue) & #2F65F6
+const Color kPrimaryColor = Color(0xFF0284C7);
 
 /// Primary color variants
-const Color kPrimaryLight = Color(0xFF5B87FA);
-const Color kPrimaryDark = Color(0xFF1E4CD8);
+const Color kPrimaryLight = Color(0xFF38BDF8);
+const Color kPrimaryDark = Color(0xFF0369A1);
 
 /// Dark text: #0F172A / #1E293B
 const Color kDarkText = Color(0xFF0F172A);
@@ -47,14 +47,22 @@ const Color kInputBackground = Color(0xFFFFFFFF);
 const Color kDisabledColor = Color(0xFF94A3B8);
 
 /// Focus ring color
-const Color kFocusColor = Color(0xFF2F65F6);
+const Color kFocusColor = Color(0xFF0284C7);
 
 /// Overlay scrim
 const Color kScrimColor = Color(0x80000000);
 
-/// Dark theme surface & background constants (Synvero Midnight Palette)
-const Color kDarkBackground = Color(0xFF0A0F1D);
-const Color kDarkSurface = Color(0xFF131D31);
-const Color kDarkCardBorder = Color(0xFF1E293B);
+/// Bioluminescent Zen & Glassmorphic Palette (from user master mockup images)
+const Color kBioluminescentBg = Color(0xFF030814); // Deep obsidian midnight background
+const Color kBioluminescentSurface = Color(0xFF071728); // Dark translucent glass card
+const Color kBioluminescentBorder = Color(0xFF0E3D48); // Glowing teal/cyan glass border
+const Color kNeonCyan = Color(0xFF00F0FF); // Electric neon cyan for progress & timer
+const Color kTealCyan = Color(0xFF0284C7); // Cyan gradient start
+const Color kTealEmerald = Color(0xFF0D9488); // Emerald teal gradient end
+
+/// Dark theme surface & background constants (Bioluminescent Zen Palette)
+const Color kDarkBackground = Color(0xFF030814);
+const Color kDarkSurface = Color(0xFF071728);
+const Color kDarkCardBorder = Color(0xFF0E3D48);
 const Color kDarkLightText = Color(0xFFF8FAFC);
-const Color kDarkMutedText = Color(0xFF94A3B8);
+const Color kDarkMutedText = Color(0xFF94A3B8);

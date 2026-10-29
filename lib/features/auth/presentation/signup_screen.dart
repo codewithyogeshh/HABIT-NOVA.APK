@@ -1,3 +1,4 @@
+import 'package:synvero/core/widgets/mountain_illustration.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:synvero/app/theme/app_colors.dart';
@@ -181,45 +182,76 @@ class _SignupScreenState extends State<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final kBgColor = isDark ? const Color(0xFF030814) : kMainBackground;
+    final kFieldFill = isDark ? const Color(0xFF071728) : kInputBackground;
+    final kFieldBorder = isDark ? const Color(0xFF0E3D48) : kBorderColor;
+    final kHeadingColor = isDark ? const Color(0xFFF1F5F9) : kDarkText;
+    final kSubtitleColor = isDark ? const Color(0xFF94A3B8) : kSecondaryText;
+
     return Scaffold(
-      backgroundColor: kMainBackground,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_rounded,
-            color: kDarkText,
-            size: 22,
+      backgroundColor: kBgColor,
+      body: Stack(
+        children: [
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: MountainIllustration(height: 140),
           ),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              Navigator.of(context).pushReplacementNamed('/login');
-            }
-          },
-        ),
-      ),
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            physics: const ClampingScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Synvero Brand Logo
-                    const SynveroLogo(
-                      iconSize: 42,
-                      titleFontSize: 24,
-                      taglineFontSize: 12,
+          SafeArea(
+            child: Column(
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_rounded,
+                      color: kHeadingColor,
+                      size: 22,
                     ),
+                    onPressed: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Navigator.of(context).pushReplacementNamed('/login');
+                      }
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      physics: const ClampingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Center(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: isDark
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFF0D9488).withValues(alpha: 0.35),
+                                              blurRadius: 70,
+                                              spreadRadius: 20,
+                                            ),
+                                          ]
+                                        : null,
+                                  ),
+                                  child: const SynveroLogo(
+                                    iconSize: 52,
+                                    titleFontSize: 24,
+                                    taglineFontSize: 12,
+                                  ),
+                                ),
+                              ),
 
                     const SizedBox(height: 28),
 
@@ -234,10 +266,10 @@ class _SignupScreenState extends State<SignupScreen> {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
+                    Text(
                       'Start your journey towards a better you',
                       style: TextStyle(
-                        color: kSecondaryText,
+                        color: kSubtitleColor,
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                       ),
@@ -268,25 +300,22 @@ class _SignupScreenState extends State<SignupScreen> {
                           color: kSecondaryText,
                         ),
                         filled: true,
-                        fillColor: kInputBackground,
+                        fillColor: kFieldFill,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: kPrimaryColor,
-                            width: 1.5,
-                          ),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                         ),
                       ),
                       validator: _validateUsername,
@@ -317,25 +346,22 @@ class _SignupScreenState extends State<SignupScreen> {
                           color: kSecondaryText,
                         ),
                         filled: true,
-                        fillColor: kInputBackground,
+                        fillColor: kFieldFill,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: kPrimaryColor,
-                            width: 1.5,
-                          ),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                         ),
                       ),
                       validator: _validateEmail,
@@ -380,25 +406,22 @@ class _SignupScreenState extends State<SignupScreen> {
                           },
                         ),
                         filled: true,
-                        fillColor: kInputBackground,
+                        fillColor: kFieldFill,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: kPrimaryColor,
-                            width: 1.5,
-                          ),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                         ),
                       ),
                       validator: _validatePassword,
@@ -444,25 +467,22 @@ class _SignupScreenState extends State<SignupScreen> {
                           },
                         ),
                         filled: true,
-                        fillColor: kInputBackground,
+                        fillColor: kFieldFill,
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 14,
                         ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(color: kBorderColor),
+                          borderSide: BorderSide(color: kFieldBorder),
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
-                          borderSide: const BorderSide(
-                            color: kPrimaryColor,
-                            width: 1.5,
-                          ),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF00E5FF) : kPrimaryColor, width: 1.5),
                         ),
                       ),
                       validator: _validateConfirmPassword,
@@ -605,13 +625,18 @@ class _SignupScreenState extends State<SignupScreen> {
                       ],
                     ),
 
-                    const SizedBox(height: 24),
-                  ],
+                    const SizedBox(height: 32),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
