@@ -21,47 +21,39 @@ class MainActivity : FlutterActivity() {
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, WIDGET_CHANNEL).setMethodCallHandler { call, result ->
             if (call.method == "updateWidgetData") {
-                val title = call.argument<String>("title") ?: "✨ HabbitNova"
-                val streak = call.argument<String>("streak") ?: "🔥 0d Streak"
-                val overallPct = call.argument<String>("overallPct") ?: (call.argument<String>("percentageText") ?: "0%")
-                val overallTotal = call.argument<Int>("overallTotal") ?: 0
-                val overallDone = call.argument<Int>("overallDone") ?: 0
+                val username = call.argument<String>("username") ?: "Yogesh"
+                val streak = call.argument<String>("streak") ?: "1d"
 
-                val habitsCount = call.argument<String>("habitsCount") ?: "0 of 0"
-                val habitsPct = call.argument<String>("habitsPct") ?: "0%"
-                val habitsTotal = call.argument<Int>("habitsTotal") ?: 0
-                val habitsDone = call.argument<Int>("habitsDone") ?: 0
+                val habitsCount = call.argument<String>("habitsCount") ?: "5 of 5"
+                val habitsTotal = call.argument<Int>("habitsTotal") ?: 5
+                val habitsDone = call.argument<Int>("habitsDone") ?: 5
+                val habitsJson = call.argument<String>("habitsJson")
 
-                val tasksCount = call.argument<String>("tasksCount") ?: "0 of 0"
-                val tasksPct = call.argument<String>("tasksPct") ?: "0%"
-                val tasksTotal = call.argument<Int>("tasksTotal") ?: 0
-                val tasksDone = call.argument<Int>("tasksDone") ?: 0
+                val tasksCount = call.argument<String>("tasksCount") ?: "2 of 4"
+                val tasksTotal = call.argument<Int>("tasksTotal") ?: 4
+                val tasksDone = call.argument<Int>("tasksDone") ?: 2
+                val tasksJson = call.argument<String>("tasksJson")
 
-                val flip1 = call.argument<String>("flip1") ?: "⚡ Daily Focus: Keep crushing goals!"
-                val flip2 = call.argument<String>("flip2") ?: "✨ $overallPct Completed — Tap to continue!"
-                val flip3 = call.argument<String>("flip3") ?: "🔥 Streak Active! Consistency builds success ➔"
+                val bannerTitle = call.argument<String>("bannerTitle") ?: "You're doing great!"
+                val bannerSubtitle = call.argument<String>("bannerSubtitle") ?: "Discipline today builds the freedom of tomorrow."
 
                 val prefs = getSharedPreferences(SynveroAppWidget.PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().apply {
-                    putString(SynveroAppWidget.KEY_TITLE, title)
+                    putString(SynveroAppWidget.KEY_USERNAME, username)
                     putString(SynveroAppWidget.KEY_STREAK, streak)
-                    putString(SynveroAppWidget.KEY_OVERALL_PCT, overallPct)
-                    putInt(SynveroAppWidget.KEY_OVERALL_TOTAL, overallTotal)
-                    putInt(SynveroAppWidget.KEY_OVERALL_DONE, overallDone)
 
                     putString(SynveroAppWidget.KEY_HABITS_COUNT, habitsCount)
-                    putString(SynveroAppWidget.KEY_HABITS_PCT, habitsPct)
                     putInt(SynveroAppWidget.KEY_HABITS_TOTAL, habitsTotal)
                     putInt(SynveroAppWidget.KEY_HABITS_DONE, habitsDone)
+                    if (habitsJson != null) putString(SynveroAppWidget.KEY_HABITS_JSON, habitsJson)
 
                     putString(SynveroAppWidget.KEY_TASKS_COUNT, tasksCount)
-                    putString(SynveroAppWidget.KEY_TASKS_PCT, tasksPct)
                     putInt(SynveroAppWidget.KEY_TASKS_TOTAL, tasksTotal)
                     putInt(SynveroAppWidget.KEY_TASKS_DONE, tasksDone)
+                    if (tasksJson != null) putString(SynveroAppWidget.KEY_TASKS_JSON, tasksJson)
 
-                    putString(SynveroAppWidget.KEY_FLIP_1, flip1)
-                    putString(SynveroAppWidget.KEY_FLIP_2, flip2)
-                    putString(SynveroAppWidget.KEY_FLIP_3, flip3)
+                    putString(SynveroAppWidget.KEY_BANNER_TITLE, bannerTitle)
+                    putString(SynveroAppWidget.KEY_BANNER_SUBTITLE, bannerSubtitle)
                     apply()
                 }
 

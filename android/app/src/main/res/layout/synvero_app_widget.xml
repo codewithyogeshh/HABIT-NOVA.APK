@@ -5,242 +5,758 @@
     android:layout_height="match_parent"
     android:background="@drawable/widget_background"
     android:orientation="vertical"
-    android:padding="12dp">
+    android:padding="14dp">
 
-    <!-- Top Header: Logo/Title + Overall % + Streak Badge -->
+    <!-- TOP HEADER: App Icon + Branding & Username + Date Pill + Streak Pill -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
-        <TextView
-            android:id="@+id/widget_app_title"
+        <ImageView
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:src="@mipmap/ic_launcher" />
+
+        <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_weight="1"
-            android:text="✨ HabbitNova"
-            android:textColor="#FFFFFF"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/widget_overall_pct"
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Habbit"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Nova"
+                    android:textColor="#4ADE80"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/widget_username_tagline"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Yogesh • Small Steps, Big Changes"
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Date Pill -->
+        <LinearLayout
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="0%"
-            android:textColor="#38BDF8"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/widget_streak_badge"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="@drawable/widget_streak_badge"
+            android:background="@drawable/widget_date_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
             android:paddingStart="8dp"
-            android:paddingTop="3dp"
+            android:paddingTop="4dp"
             android:paddingEnd="8dp"
-            android:paddingBottom="3dp"
-            android:text="🔥 0d Streak"
-            android:textColor="#FFFFFF"
-            android:textSize="11sp"
-            android:textStyle="bold" />
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📅"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_date_text"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Apr 26, 2025"
+                    android:textColor="#FFFFFF"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/widget_date_day"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Saturday"
+                    android:textColor="#94A3B8"
+                    android:textSize="8sp" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Streak Pill -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/widget_streak_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔥"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/widget_streak_days"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1d"
+                    android:textColor="#FDE68A"
+                    android:textSize="10sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Streak"
+                    android:textColor="#F59E0B"
+                    android:textSize="8sp" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
-    <!-- Overall Progress Mini Bar -->
-    <ProgressBar
-        android:id="@+id/widget_overall_bar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="4dp"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="8dp"
-        android:max="100"
-        android:progress="0"
-        android:progressDrawable="@drawable/progress_overall_glowing" />
-
-    <!-- Two Separate Distinct Sections (Habits & Tasks) -->
+    <!-- MIDDLE SECTION: Habits Card on Left, Tasks Card on Right -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
+        android:layout_marginTop="10dp"
         android:layout_weight="1"
         android:orientation="horizontal">
 
-        <!-- SECTION 1: HABITS (Emerald Neon Glow Card) -->
+        <!-- ================= CARD 1: HABITS ================= -->
         <LinearLayout
-            android:id="@+id/widget_habits_card"
             android:layout_width="0dp"
             android:layout_height="match_parent"
+            android:layout_marginEnd="5dp"
             android:layout_weight="1"
-            android:layout_marginEnd="4dp"
             android:background="@drawable/widget_card_habits"
             android:orientation="vertical"
-            android:paddingStart="8dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="6dp">
+            android:padding="10dp">
 
+            <!-- Habits Header -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
+                <FrameLayout
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:background="@drawable/widget_icon_circle_green">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="🌿"
+                        android:textSize="11sp" />
+                </FrameLayout>
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:text="🎯 HABITS"
-                    android:textColor="#34D399"
-                    android:textSize="10sp"
+                    android:text="Habits"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_habits_bar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="45dp"
+                    android:layout_height="5dp"
+                    android:max="100"
+                    android:progress="80"
+                    android:progressDrawable="@drawable/progress_habits_glowing" />
 
                 <TextView
-                    android:id="@+id/widget_habits_pct"
+                    android:id="@+id/widget_habits_count"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="0%"
-                    android:textColor="#6EE7B7"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
+                    android:layout_marginStart="6dp"
+                    android:text="5 of 5"
+                    android:textColor="#9CA3AF"
+                    android:textSize="10sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/widget_habits_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="0 of 5"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/widget_habits_bar"
-                style="?android:attr/progressBarStyleHorizontal"
+            <ImageView
                 android:layout_width="match_parent"
-                android:layout_height="5dp"
-                android:layout_marginTop="4dp"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/progress_habits_glowing" />
+                android:layout_height="1dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="4dp"
+                android:background="#15FFFFFF" />
+
+            <!-- Habit Rows List -->
+            <!-- Row 1 -->
+            <LinearLayout
+                android:id="@+id/widget_habit_row_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <ImageView
+                    android:id="@+id/widget_habit_check_1"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_green" />
+
+                <TextView
+                    android:id="@+id/widget_habit_icon_1"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="💧"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_habit_title_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Drink Water"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_habit_div_1"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Row 2 -->
+            <LinearLayout
+                android:id="@+id/widget_habit_row_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <ImageView
+                    android:id="@+id/widget_habit_check_2"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_green" />
+
+                <TextView
+                    android:id="@+id/widget_habit_icon_2"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="🏋️"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_habit_title_2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Workout"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_habit_div_2"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Row 3 -->
+            <LinearLayout
+                android:id="@+id/widget_habit_row_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <ImageView
+                    android:id="@+id/widget_habit_check_3"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_green" />
+
+                <TextView
+                    android:id="@+id/widget_habit_icon_3"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="📖"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_habit_title_3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Read Book"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_habit_div_3"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Row 4 -->
+            <LinearLayout
+                android:id="@+id/widget_habit_row_4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <ImageView
+                    android:id="@+id/widget_habit_check_4"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_green" />
+
+                <TextView
+                    android:id="@+id/widget_habit_icon_4"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="🧘"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_habit_title_4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Meditate"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_habit_div_4"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Row 5 -->
+            <LinearLayout
+                android:id="@+id/widget_habit_row_5"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="3dp"
+                android:paddingBottom="3dp">
+
+                <ImageView
+                    android:id="@+id/widget_habit_check_5"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_green" />
+
+                <TextView
+                    android:id="@+id/widget_habit_icon_5"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:text="🌙"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/widget_habit_title_5"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Sleep Early"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- SECTION 2: TASKS (Purple Neon Glow Card) -->
+        <!-- ================= CARD 2: TASKS ================= -->
         <LinearLayout
-            android:id="@+id/widget_tasks_card"
             android:layout_width="0dp"
             android:layout_height="match_parent"
+            android:layout_marginStart="5dp"
             android:layout_weight="1"
-            android:layout_marginStart="4dp"
             android:background="@drawable/widget_card_tasks"
             android:orientation="vertical"
-            android:paddingStart="8dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="8dp"
-            android:paddingBottom="6dp">
+            android:padding="10dp">
 
+            <!-- Tasks Header -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
+                <FrameLayout
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:background="@drawable/widget_icon_circle_purple">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:text="📋"
+                        android:textSize="11sp" />
+                </FrameLayout>
+
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:text="📋 TASKS"
-                    android:textColor="#C084FC"
-                    android:textSize="10sp"
+                    android:text="Tasks"
+                    android:textColor="#FFFFFF"
+                    android:textSize="13sp"
                     android:textStyle="bold" />
+
+                <ProgressBar
+                    android:id="@+id/widget_tasks_bar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="45dp"
+                    android:layout_height="5dp"
+                    android:max="100"
+                    android:progress="50"
+                    android:progressDrawable="@drawable/progress_tasks_glowing" />
 
                 <TextView
-                    android:id="@+id/widget_tasks_pct"
+                    android:id="@+id/widget_tasks_count"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="0%"
-                    android:textColor="#E9D5FF"
-                    android:textSize="10sp"
-                    android:textStyle="bold" />
+                    android:layout_marginStart="6dp"
+                    android:text="2 of 4"
+                    android:textColor="#9CA3AF"
+                    android:textSize="10sp" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/widget_tasks_count"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="0 of 4"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp"
-                android:textStyle="bold" />
-
-            <ProgressBar
-                android:id="@+id/widget_tasks_bar"
-                style="?android:attr/progressBarStyleHorizontal"
+            <ImageView
                 android:layout_width="match_parent"
-                android:layout_height="5dp"
-                android:layout_marginTop="4dp"
-                android:max="100"
-                android:progress="0"
-                android:progressDrawable="@drawable/progress_tasks_glowing" />
+                android:layout_height="1dp"
+                android:layout_marginTop="6dp"
+                android:layout_marginBottom="4dp"
+                android:background="#15FFFFFF" />
+
+            <!-- Task Rows List -->
+            <!-- Task 1 -->
+            <LinearLayout
+                android:id="@+id/widget_task_row_1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_task_check_1"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_purple" />
+
+                <TextView
+                    android:id="@+id/widget_task_title_1"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Complete Project"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_task_div_1"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Task 2 -->
+            <LinearLayout
+                android:id="@+id/widget_task_row_2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_task_check_2"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_purple" />
+
+                <TextView
+                    android:id="@+id/widget_task_title_2"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Learn Java"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_task_div_2"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Task 3 -->
+            <LinearLayout
+                android:id="@+id/widget_task_row_3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_task_check_3"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_empty" />
+
+                <TextView
+                    android:id="@+id/widget_task_title_3"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Design Portfolio"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/widget_task_div_3"
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#10FFFFFF" />
+
+            <!-- Task 4 -->
+            <LinearLayout
+                android:id="@+id/widget_task_row_4"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp">
+
+                <ImageView
+                    android:id="@+id/widget_task_check_4"
+                    android:layout_width="14dp"
+                    android:layout_height="14dp"
+                    android:src="@drawable/ic_check_empty" />
+
+                <TextView
+                    android:id="@+id/widget_task_title_4"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Workout Plan"
+                    android:textColor="#F3F4F6"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="›"
+                    android:textColor="#64748B"
+                    android:textSize="12sp" />
+            </LinearLayout>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Animated Attention-Grabbing Flipper Banner -->
-    <FrameLayout
+    <!-- BOTTOM CARD: Motivational Banner with Sparkle & Sprout -->
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="7dp"
-        android:background="@drawable/widget_flipper_bg"
-        android:paddingStart="8dp"
-        android:paddingTop="3dp"
-        android:paddingEnd="8dp"
-        android:paddingBottom="3dp">
+        android:layout_marginTop="10dp"
+        android:background="@drawable/widget_bottom_banner"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="8dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
 
-        <ViewFlipper
-            android:id="@+id/widget_flipper"
-            android:layout_width="match_parent"
+        <FrameLayout
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/widget_icon_circle_green">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:text="✦"
+                android:textColor="#34D399"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+        </FrameLayout>
+
+        <LinearLayout
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:autoStart="true"
-            android:flipInterval="3200"
-            android:inAnimation="@android:anim/fade_in"
-            android:outAnimation="@android:anim/fade_out">
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
 
             <TextView
-                android:id="@+id/widget_flip_msg1"
-                android:layout_width="match_parent"
+                android:id="@+id/widget_banner_title"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text="⚡ Daily Focus: 0 Habits • 0 Tasks Done"
-                android:textColor="#67E8F9"
-                android:textSize="10sp"
+                android:text="You're doing great!"
+                android:textColor="#4ADE80"
+                android:textSize="12sp"
                 android:textStyle="bold" />
 
             <TextView
-                android:id="@+id/widget_flip_msg2"
-                android:layout_width="match_parent"
+                android:id="@+id/widget_banner_subtitle"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text="✨ Tap to track progress &amp; stay on top!"
-                android:textColor="#A7F3D0"
-                android:textSize="10sp"
-                android:textStyle="bold" />
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Discipline today builds the freedom of tomorrow."
+                android:textColor="#94A3B8"
+                android:textSize="10sp" />
+        </LinearLayout>
 
-            <TextView
-                android:id="@+id/widget_flip_msg3"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:singleLine="true"
-                android:text="🔥 Streak Active! Build greatness daily ➔"
-                android:textColor="#FDE047"
-                android:textSize="10sp"
-                android:textStyle="bold" />
-        </ViewFlipper>
-    </FrameLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="~• 🌱"
+            android:textColor="#4ADE80"
+            android:textSize="13sp" />
+    </LinearLayout>
 </LinearLayout>
