@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+import 'package:synvero/core/navigation/app_navigator.dart';
 
 import 'dart:async';
 import 'dart:io';
@@ -34,6 +36,13 @@ class NotificationService {
   static const String _alarmChannelName = 'Synvero Task Alarms (Loud)';
   static const String _alarmChannelDescription =
       'High priority ringing alarm alerts for scheduled tasks and habits';
+
+  // Ongoing Focus Timer & Ambient Sound Channel
+  static const int _focusNotificationId = 99901;
+  static const String _focusChannelId = 'synvero_focus_timer_channel_v2';
+  static const String _focusChannelName = 'Synvero Focus Session';
+  static const String _focusChannelDescription =
+      'Ongoing notification while Focus Timer or Ambient Sounds are active';
 
   // 5-minute advance reminder channel
   static const String _reminderChannelId = 'synvero_task_reminders_channel_v6';
@@ -118,6 +127,14 @@ class NotificationService {
         initSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) async {
           debugPrint('Notification clicked/action: ${response.actionId}, payload: ${response.payload}');
+          if (response.payload == '/timer') {
+            appNavigatorKey.currentState?.pushNamed('/timer');
+            return;
+          }
+          if (response.payload == '/ai-assistant' || response.payload == '/ai_assistant') {
+            appNavigatorKey.currentState?.pushNamed('/ai-assistant');
+            return;
+          }
           // DO NOT cancel the alarm here! Touching notification keeps alarm playing!
           if (response.id != null && response.id! < 9000) {
             await startNativeAlarm();
@@ -165,6 +182,18 @@ class NotificationService {
           );
           await androidImplementation.createNotificationChannel(reminderChannel);
 
+          // 3. Ongoing Focus Timer & Sound Channel
+          const focusChannel = AndroidNotificationChannel(
+            _focusChannelId,
+            _focusChannelName,
+            description: _focusChannelDescription,
+            importance: Importance.low,
+            playSound: false,
+            enableVibration: false,
+            showBadge: false,
+          );
+          await androidImplementation.createNotificationChannel(focusChannel);
+
           // Request permissions for Android 13+ (API 33/34)
           await androidImplementation.requestNotificationsPermission();
           await androidImplementation.requestExactAlarmsPermission();
@@ -180,16 +209,30 @@ class NotificationService {
             await _notificationsPlugin.getNotificationAppLaunchDetails();
         if (launchDetails != null && launchDetails.didNotificationLaunchApp) {
           final res = launchDetails.notificationResponse;
-          if (res != null && res.id != null) {
-            await startNativeAlarm();
-            activeAlarmNotifier.value = ActiveAlarm(
-              id: res.id!,
-              title: res.payload?.isNotEmpty == true
-                  ? res.payload!
-                  : 'Scheduled Task Alarm',
-              body: 'Time for your scheduled task!',
-              time: DateTime.now(),
-            );
+          if (res != null) {
+            if (res.payload == '/timer') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                appNavigatorKey.currentState?.pushNamed('/timer');
+              });
+              return;
+            }
+            if (res.payload == '/ai-assistant' || res.payload == '/ai_assistant') {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                appNavigatorKey.currentState?.pushNamed('/ai-assistant');
+              });
+              return;
+            }
+            if (res.id != null && res.id! < 9000) {
+              await startNativeAlarm();
+              activeAlarmNotifier.value = ActiveAlarm(
+                id: res.id!,
+                title: res.payload?.isNotEmpty == true
+                    ? res.payload!
+                    : 'Scheduled Task Alarm',
+                body: 'Time for your scheduled task!',
+                time: DateTime.now(),
+              );
+            }
           }
         }
       } catch (e) {
@@ -739,5 +782,98 @@ class NotificationService {
   static Future<void> setTaskRemindersEnabled(bool val) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_prefTasks, val);
+  }
+
+  /// Displays or updates ongoing Focus Timer & Ambient Sound notification
+  static Future<void> showFocusNotification({
+    required String title,
+    required String body,
+    bool ongoing = true,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      final androidDetails = AndroidNotificationDetails(
+        _focusChannelId,
+        _focusChannelName,
+        channelDescription: _focusChannelDescription,
+        importance: Importance.low,
+        priority: Priority.low,
+        ongoing: ongoing,
+        autoCancel: !ongoing,
+        onlyAlertOnce: true,
+        showWhen: true,
+        icon: '@mipmap/ic_launcher',
+        category: AndroidNotificationCategory.stopwatch,
+      );
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: false,
+          presentBadge: false,
+        ),
+      );
+
+      await _notificationsPlugin.show(
+        _focusNotificationId,
+        title,
+        body,
+        notificationDetails,
+        payload: '/timer',
+      );
+    } catch (e) {
+      debugPrint('Error showing focus notification: $e');
+    }
+  }
+
+  /// Cancels the ongoing focus timer & ambient sound notification
+  static Future<void> cancelFocusNotification() async {
+    if (kIsWeb) return;
+    try {
+      await _notificationsPlugin.cancel(_focusNotificationId);
+    } catch (e) {
+      debugPrint('Error cancelling focus notification: $e');
+    }
+  }
+
+  /// Shows completion notification when focus session ends
+  static Future<void> showFocusCompletionNotification({
+    required String title,
+    required String body,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      final androidDetails = AndroidNotificationDetails(
+        _reminderChannelId,
+        _reminderChannelName,
+        channelDescription: _reminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        ongoing: false,
+        autoCancel: true,
+        showWhen: true,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      final notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+          presentBadge: true,
+        ),
+      );
+
+      await _notificationsPlugin.show(
+        _focusNotificationId,
+        title,
+        body,
+        notificationDetails,
+        payload: '/timer',
+      );
+    } catch (e) {
+      debugPrint('Error showing focus completion notification: $e');
+    }
   }
 }

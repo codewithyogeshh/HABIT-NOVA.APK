@@ -1,10 +1,6 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
-import 'package:synvero/core/services/gamification_service.dart';
-import 'package:synvero/core/services/focus_sound_service.dart';
-import 'package:synvero/core/services/supabase_service.dart';
+import 'package:synvero/core/services/focus_timer_service.dart';
 import 'package:synvero/features/timer/presentation/focus_sound_selector_widget.dart';
 
 /// Study Timer screen.
@@ -30,152 +26,60 @@ class StudyTimerScreen extends StatefulWidget {
 }
 
 class _StudyTimerScreenState extends State<StudyTimerScreen> {
-  int _selectedModeIndex = 0; // 0: Pomodoro, 1: Short Break, 2: Long Break
+  final _timerService = FocusTimerService.instance;
 
-  // User-configurable durations (in minutes)
-  int _customFocusMinutes = 25;
-  int _customShortBreakMinutes = 5;
-  int _customLongBreakMinutes = 15;
-
-  late int _totalSeconds;
-  late int _remainingSeconds;
-  Timer? _timer;
-  bool _isRunning = false;
-  int _completedSessions = 0;
+  int get _selectedModeIndex => _timerService.selectedModeIndexNotifier.value;
+  int get _customFocusMinutes => _timerService.customFocusMinutes;
+  int get _customShortBreakMinutes => _timerService.customShortBreakMinutes;
+  int get _customLongBreakMinutes => _timerService.customLongBreakMinutes;
+  int get _totalSeconds => _timerService.totalSecondsNotifier.value;
+  int get _remainingSeconds => _timerService.remainingSecondsNotifier.value;
+  bool get _isRunning => _timerService.isRunningNotifier.value;
+  int get _completedSessions => _timerService.completedSessionsNotifier.value;
   final int _targetSessions = 4;
   int _currentTabIndex = 2; // Timer tab
-
-  String get _currentUserId => SupabaseService.user?.id ?? 'guest';
 
   @override
   void initState() {
     super.initState();
-    _totalSeconds = _customFocusMinutes * 60;
-    _remainingSeconds = _totalSeconds;
-    _loadPreferences();
+    _timerService.remainingSecondsNotifier.addListener(_onTimerStateChanged);
+    _timerService.isRunningNotifier.addListener(_onTimerStateChanged);
+    _timerService.selectedModeIndexNotifier.addListener(_onTimerStateChanged);
+    _timerService.completedSessionsNotifier.addListener(_onTimerStateChanged);
+    _timerService.loadPreferences();
   }
 
-  Future<void> _loadPreferences() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // Load session count (strictly 0 by default for all users until completed)
-      final sessionKey = 'user_${_currentUserId}_timer_completed_sessions';
-      _completedSessions = prefs.getInt(sessionKey) ?? 0;
-
-      // Load custom durations
-      final focusKey = 'user_${_currentUserId}_focus_duration_mins';
-      final shortKey = 'user_${_currentUserId}_short_break_mins';
-      final longKey = 'user_${_currentUserId}_long_break_mins';
-
-      final savedFocus = prefs.getInt(focusKey);
-      final savedShort = prefs.getInt(shortKey);
-      final savedLong = prefs.getInt(longKey);
-
-      setState(() {
-        if (savedFocus != null && savedFocus > 0) _customFocusMinutes = savedFocus;
-        if (savedShort != null && savedShort > 0) _customShortBreakMinutes = savedShort;
-        if (savedLong != null && savedLong > 0) _customLongBreakMinutes = savedLong;
-        _resetToMode(_selectedModeIndex);
-      });
-    } catch (_) {}
-  }
-
-  Future<void> _setFocusDuration(int minutes) async {
-    if (minutes < 1) minutes = 1;
-    if (minutes > 180) minutes = 180;
-    _timer?.cancel();
-    setState(() {
-      _customFocusMinutes = minutes;
-      _isRunning = false;
-      if (_selectedModeIndex == 0) {
-        _totalSeconds = minutes * 60;
-        _remainingSeconds = _totalSeconds;
-      }
-    });
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('user_${_currentUserId}_focus_duration_mins', minutes);
-    } catch (_) {}
-  }
-
-  Future<void> _recordCompletedSession() async {
-    setState(() {
-      _completedSessions++;
-    });
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('user_${_currentUserId}_timer_completed_sessions', _completedSessions);
-      await GamificationService.addXP(GamificationService.xpPerStudyTimer, reason: 'Completed Focus Session');
-      await GamificationService.unlockBadge('focus_titan');
-    } catch (_) {}
+  void _onTimerStateChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
-    FocusSoundService.stopSound();
+    _timerService.remainingSecondsNotifier.removeListener(_onTimerStateChanged);
+    _timerService.isRunningNotifier.removeListener(_onTimerStateChanged);
+    _timerService.selectedModeIndexNotifier.removeListener(_onTimerStateChanged);
+    _timerService.completedSessionsNotifier.removeListener(_onTimerStateChanged);
     super.dispose();
   }
 
   void _resetToMode(int modeIndex) {
-    _timer?.cancel();
-    _selectedModeIndex = modeIndex;
-    _isRunning = false;
-
-    if (modeIndex == 0) {
-      _totalSeconds = _customFocusMinutes * 60;
-    } else if (modeIndex == 1) {
-      _totalSeconds = _customShortBreakMinutes * 60;
-    } else {
-      _totalSeconds = _customLongBreakMinutes * 60;
-    }
-    _remainingSeconds = _totalSeconds;
+    _timerService.setMode(modeIndex);
   }
 
   void _toggleTimer() {
-    if (_isRunning) {
-      _timer?.cancel();
-      setState(() {
-        _isRunning = false;
-      });
-    } else {
-      setState(() {
-        _isRunning = true;
-      });
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_remainingSeconds > 0) {
-          setState(() {
-            _remainingSeconds--;
-          });
-        } else {
-          timer.cancel();
-          setState(() {
-            _isRunning = false;
-            if (_selectedModeIndex == 0) {
-              _recordCompletedSession();
-            }
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Focus session completed! Great job! 🎉'),
-              backgroundColor: Color(0xFF10B981),
-            ),
-          );
-        }
-      });
-    }
+    _timerService.toggleTimer();
   }
 
   void _resetTimer() {
-    _resetToMode(_selectedModeIndex);
-    setState(() {});
+    _timerService.resetTimer();
+  }
+
+  Future<void> _setFocusDuration(int minutes) async {
+    await _timerService.setFocusDuration(minutes);
   }
 
   String _formatTime(int totalSecs) {
-    final minutes = totalSecs ~/ 60;
-    final seconds = totalSecs % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+    return FocusTimerService.formatTime(totalSecs);
   }
 
   void _showDurationPickerSheet() {
@@ -477,8 +381,8 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                 child: Row(
                   children: [
                     _buildModeTab('Focus (${_customFocusMinutes}m)', 0),
-                    _buildModeTab('Short (5m)', 1),
-                    _buildModeTab('Long (15m)', 2),
+                    _buildModeTab('Short (${_customShortBreakMinutes}m)', 1),
+                    _buildModeTab('Long (${_customLongBreakMinutes}m)', 2),
                   ],
                 ),
               ),

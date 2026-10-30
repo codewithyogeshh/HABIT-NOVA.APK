@@ -43,58 +43,58 @@ class AICoachCard extends StatelessWidget {
     final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF00F0FF).withValues(alpha: isDark ? 0.12 : 0.08),
-            kCardBg,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.35)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF00F0FF).withValues(alpha: 0.08),
-            blurRadius: 14,
-            offset: const Offset(0, 4),
+    return InkWell(
+      onTap: onChatTapped,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF00F0FF).withValues(alpha: isDark ? 0.12 : 0.08),
+              kCardBg,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(7),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.35)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00F0FF).withValues(alpha: 0.08),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00F0FF), size: 16),
                     ),
-                    child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00F0FF), size: 16),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '$_greeting, $username ☀️',
-                    style: TextStyle(
-                      color: kTextColor,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(width: 10),
+                    Text(
+                      '$_greeting, $username ☀️',
+                      style: TextStyle(
+                        color: kTextColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              InkWell(
-                onTap: onChatTapped,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
+                  ],
+                ),
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
                     color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
@@ -117,20 +117,20 @@ class AICoachCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _coachMessage,
-            style: TextStyle(
-              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-              fontSize: 12.5,
-              height: 1.4,
-              fontWeight: FontWeight.w500,
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 10),
+            Text(
+              _coachMessage,
+              style: TextStyle(
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                fontSize: 12.5,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

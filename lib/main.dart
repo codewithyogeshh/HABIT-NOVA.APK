@@ -1,3 +1,4 @@
+import 'package:synvero/core/navigation/app_navigator.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:flutter/material.dart';
@@ -144,8 +145,7 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  final _navigatorKey = GlobalKey<NavigatorState>();
-  final _authRepository = AuthRepository();
+    final _authRepository = AuthRepository();
   bool _isLoading = true;
   bool _isAuthenticated = false;
 
@@ -193,7 +193,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isAuthenticated = true;
       });
       // Navigate to dashboard after successful login
-      _navigatorKey.currentState?.pushReplacementNamed('/dashboard');
+      appNavigatorKey.currentState?.pushReplacementNamed('/dashboard');
     } catch (e) {
       rethrow; // Let the screen handle the error display
     }
@@ -214,7 +214,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         _isAuthenticated = true;
       });
       // Navigate to dashboard after successful signup
-      _navigatorKey.currentState?.pushReplacementNamed('/dashboard');
+      appNavigatorKey.currentState?.pushReplacementNamed('/dashboard');
     } catch (e) {
       rethrow; // Let the screen handle the error display
     }
@@ -232,7 +232,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     return Navigator(
-      key: _navigatorKey,
+      key: appNavigatorKey,
       initialRoute: _isAuthenticated ? '/dashboard' : '/login',
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -255,6 +255,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           case '/tasks':
             return MaterialPageRoute(builder: (context) => const TasksScreen());
           case '/ai_assistant':
+          case '/ai-assistant':
             return MaterialPageRoute(builder: (context) => const AIAssistantScreen());
           case '/profile':
             return MaterialPageRoute(builder: (context) => const ProfileScreen());
