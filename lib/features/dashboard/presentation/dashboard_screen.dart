@@ -138,6 +138,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       final user = SupabaseService.user;
       final currentUserId = user?.id ?? 'guest';
       await AvatarService.loadForUser(currentUserId);
+      if (user != null) {
+        await GamificationService.restoreFromCloud(user.id);
+      }
 
       // Check and execute midnight habit reset if date changed
       await HabitDailyService.verifyAndPerformMidnightReset(currentUserId);

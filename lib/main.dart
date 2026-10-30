@@ -1,3 +1,4 @@
+import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/navigation/app_navigator.dart';
 import 'package:synvero/core/services/supabase_service.dart';
@@ -220,6 +221,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final user = SupabaseService.user;
       if (user != null) {
         await AvatarService.loadForUser(user.id);
+        await GamificationService.restoreFromCloud(user.id);
         final metaUsername = user.userMetadata?['username'] as String?;
         final effectiveName = (metaUsername != null && metaUsername.isNotEmpty)
             ? metaUsername

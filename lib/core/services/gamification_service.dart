@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/leaderboard_service.dart';
@@ -160,6 +162,37 @@ class GamificationService {
     {'level': 9, 'title': 'Apex Conqueror', 'minXP': 12000, 'maxXP': 18000, 'emoji': '👑', 'color': Color(0xFFA855F7)},
     {'level': 10, 'title': 'Nova Grandmaster', 'minXP': 18000, 'maxXP': 999999, 'emoji': '🌌', 'color': Color(0xFFEC4899)},
   ];
+
+  /// Restores user's XP, streak, and progress from Cloud Firestore
+  /// so that logging in on any device restores their full progress.
+  static Future<void> restoreFromCloud(String userId) async {
+    try {
+      final cleanId = userId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+      final url = 'https://firestore.googleapis.com/v1/projects/taskflow-c57d8/databases/(default)/documents/community_leaderboard/$cleanId?key=AIzaSyBMPwBRrvllX1AOEAwczp0Xo6fGwg7hr6c';
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 4));
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final fields = data['fields'] as Map<String, dynamic>?;
+        if (fields != null) {
+          final cloudXP = int.tryParse(fields['xp']?['integerValue']?.toString() ?? '0') ?? 0;
+          final cloudStreak = int.tryParse(fields['streakDays']?['integerValue']?.toString() ?? '0') ?? 0;
+
+          final prefs = await SharedPreferences.getInstance();
+          final localXP = prefs.getInt(_xpKey(userId)) ?? 0;
+          if (cloudXP > localXP) {
+            await prefs.setInt(_xpKey(userId), cloudXP);
+            totalXPNotifier.value = cloudXP;
+          }
+          if (cloudStreak > 0) {
+            await prefs.setInt('user_${userId}_streak_days', cloudStreak);
+            await prefs.setInt('app_streak_days', cloudStreak);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('GamificationService.restoreFromCloud error: $e');
+    }
+  }
 
   /// Loads the total XP for the current user
   static Future<int> loadXP({String? userId}) async {
