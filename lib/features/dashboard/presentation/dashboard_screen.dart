@@ -536,44 +536,77 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          InkWell(
-                            onTap: () {
-                              final quote = QuoteService.currentQuote;
-                              ShareStoryCardDialog.show(
-                                context,
-                                username: displayName,
-                                streakDays: _streakDays,
-                                habitsCompleted: _completedHabitsCount,
-                                totalHabits: 5,
-                                totalXP: _totalXP,
-                                quoteText: quote.text,
-                                quoteAuthor: quote.author,
-                              );
-                            },
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InkWell(
+                                onTap: () => Navigator.of(context).pushNamed('/leaderboard'),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.share_rounded, size: 13, color: Color(0xFF00F0FF)),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Share Story',
-                                    style: TextStyle(
-                                      color: Color(0xFF00F0FF),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
                                   ),
-                                ],
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.emoji_events_rounded, size: 12, color: Color(0xFFFFD700)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Ranks',
+                                        style: TextStyle(
+                                          color: Color(0xFFFFD700),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                              InkWell(
+                                onTap: () {
+                                  final quote = QuoteService.currentQuote;
+                                  ShareStoryCardDialog.show(
+                                    context,
+                                    username: displayName,
+                                    streakDays: _streakDays,
+                                    habitsCompleted: _completedHabitsCount,
+                                    totalHabits: 5,
+                                    totalXP: _totalXP,
+                                    quoteText: quote.text,
+                                    quoteAuthor: quote.author,
+                                  );
+                                },
+                                borderRadius: BorderRadius.circular(12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.share_rounded, size: 12, color: Color(0xFF00F0FF)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Story',
+                                        style: TextStyle(
+                                          color: Color(0xFF00F0FF),
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -709,51 +742,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 8),
 
-                      // Quick Action 4 Icon Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildQuickActionButton(
-                            icon: Icons.eco_rounded,
-                            label: 'Habits',
-                            color: const Color(0xFF10B981),
-                            bgColor: const Color(0xFFD1FAE5),
-                            isDark: isDark,
-                            onTap: () {
-                              Navigator.of(context).pushNamed('/habits').then((_) => _loadProfile());
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.hourglass_top_rounded,
-                            label: 'Study Timer',
-                            color: const Color(0xFF8B5CF6),
-                            bgColor: const Color(0xFFEDE9FE),
-                            isDark: isDark,
-                            onTap: () {
-                              Navigator.of(context).pushNamed('/timer');
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.checklist_rounded,
-                            label: 'Tasks',
-                            color: const Color(0xFF3B66FF),
-                            bgColor: const Color(0xFFDBEAFE),
-                            isDark: isDark,
-                            onTap: () {
-                              Navigator.of(context).pushNamed('/tasks');
-                            },
-                          ),
-                          _buildQuickActionButton(
-                            icon: Icons.auto_awesome_rounded,
-                            label: 'AI Assistant',
-                            color: const Color(0xFF6366F1),
-                            bgColor: const Color(0xFFE0E7FF),
-                            isDark: isDark,
-                            onTap: () {
-                              Navigator.of(context).pushNamed('/ai_assistant');
-                            },
-                          ),
-                        ],
+                      // Quick Actions Scrollable Row (6 Features)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _buildQuickActionButton(
+                              icon: Icons.eco_rounded,
+                              label: 'Habits',
+                              color: const Color(0xFF10B981),
+                              bgColor: const Color(0xFFD1FAE5),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/habits').then((_) => _loadProfile());
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.hourglass_top_rounded,
+                              label: 'Study Timer',
+                              color: const Color(0xFF8B5CF6),
+                              bgColor: const Color(0xFFEDE9FE),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/timer');
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.checklist_rounded,
+                              label: 'Tasks',
+                              color: const Color(0xFF3B66FF),
+                              bgColor: const Color(0xFFDBEAFE),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/tasks');
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.auto_awesome_rounded,
+                              label: 'AI Assistant',
+                              color: const Color(0xFF6366F1),
+                              bgColor: const Color(0xFFE0E7FF),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/ai-assistant');
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.bar_chart_rounded,
+                              label: 'Statistics',
+                              color: const Color(0xFF00E5FF),
+                              bgColor: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/statistics');
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.emoji_events_rounded,
+                              label: 'Leaderboard',
+                              color: const Color(0xFFFFD700),
+                              bgColor: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/leaderboard');
+                              },
+                            ),
+                          ],
+                        ),
                       ),
 
                       const SizedBox(height: 24),

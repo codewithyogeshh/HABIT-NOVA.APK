@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -5,7 +6,10 @@ import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 
-/// Interactive bioluminescent Water Intake Tracker with 8 animated glass taps.
+/// Interactive bioluminescent Water Intake Tracker with 8 animated glasses.
+///
+/// Automatically resets every day at midnight (12:00 AM).
+/// Manual reset is disabled so users cannot accidentally clear their daily progress.
 class WaterTrackerCard extends StatefulWidget {
   final VoidCallback? onWaterUpdated;
 
@@ -15,27 +19,68 @@ class WaterTrackerCard extends StatefulWidget {
   State<WaterTrackerCard> createState() => _WaterTrackerCardState();
 }
 
-class _WaterTrackerCardState extends State<WaterTrackerCard> {
+class _WaterTrackerCardState extends State<WaterTrackerCard> with WidgetsBindingObserver {
   int _glassesFilled = 0;
   static const int _targetGlasses = 8;
   static const int _mlPerGlass = 250;
 
+  String? _lastCheckedDate;
+  Timer? _midnightCheckTimer;
+
   String get _currentUserId => SupabaseService.user?.id ?? 'guest';
-  String get _waterPrefKey => 'user_${_currentUserId}_water_glasses_${DateTime.now().toIso8601String().split('T').first}';
+  String get _todayDateStr => DateTime.now().toIso8601String().split('T').first;
+  String get _waterPrefKey => 'user_${_currentUserId}_water_glasses_$_todayDateStr';
+  String get _lastHydrationDateKey => 'user_${_currentUserId}_last_hydration_date';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadWaterState();
+
+    // Check periodically so the counter automatically resets at 12:00 AM midnight
+    _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (_lastCheckedDate != null && _lastCheckedDate != _todayDateStr) {
+        _loadWaterState();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _midnightCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (_lastCheckedDate != null && _lastCheckedDate != _todayDateStr) {
+        _loadWaterState();
+      }
+    }
   }
 
   Future<void> _loadWaterState() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final count = prefs.getInt(_waterPrefKey) ?? 4; // Default starter for demo
+      final today = _todayDateStr;
+      final lastDate = prefs.getString(_lastHydrationDateKey);
+
+      // Automatic midnight reset when date changes
+      if (lastDate != today) {
+        await prefs.setString(_lastHydrationDateKey, today);
+        if (!prefs.containsKey(_waterPrefKey)) {
+          await prefs.setInt(_waterPrefKey, 0);
+        }
+      }
+
+      final count = prefs.getInt(_waterPrefKey) ?? 0;
       if (mounted) {
         setState(() {
           _glassesFilled = count.clamp(0, _targetGlasses);
+          _lastCheckedDate = today;
         });
       }
     } catch (_) {}
@@ -45,6 +90,11 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
     final newCount = count.clamp(0, _targetGlasses);
     final previousCount = _glassesFilled;
 
+    // Only allow progressing forward; manual reset is strictly forbidden
+    if (newCount <= previousCount && previousCount > 0) {
+      return;
+    }
+
     HapticFeedback.lightImpact();
 
     setState(() {
@@ -53,11 +103,15 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastHydrationDateKey, _todayDateStr);
       await prefs.setInt(_waterPrefKey, newCount);
 
-      // Award XP if completed full 8 glasses
+      // Award XP when completing full 8 glasses
       if (newCount == _targetGlasses && previousCount < _targetGlasses) {
-        await GamificationService.addXP(GamificationService.xpPerWaterGoal, reason: 'Completed 8 glasses of water');
+        await GamificationService.addXP(
+          GamificationService.xpPerWaterGoal,
+          reason: 'Completed 8 glasses of water',
+        );
         await GamificationService.unlockBadge('hydration_hero');
 
         if (mounted) {
@@ -85,6 +139,7 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
     final totalMl = _glassesFilled * _mlPerGlass;
     final targetMl = _targetGlasses * _mlPerGlass;
     final percent = (_glassesFilled / _targetGlasses).clamp(0.0, 1.0);
+    final isGoalMet = _glassesFilled >= _targetGlasses;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -92,7 +147,7 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
         color: kCardBg,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: _glassesFilled == _targetGlasses
+          color: isGoalMet
               ? const Color(0xFF00F0FF).withValues(alpha: 0.6)
               : kBorderColor,
         ),
@@ -136,7 +191,7 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
                         ),
                       ),
                       Text(
-                        '$totalMl / $targetMl ml ($glassesFilledCount)',
+                        '$totalMl / $targetMl ml ($_glassesFilled/$_targetGlasses glasses)',
                         style: TextStyle(
                           color: kSubtextColor,
                           fontSize: 12,
@@ -148,36 +203,54 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
                 ],
               ),
 
-              // Quick Add Button
-              InkWell(
-                onTap: () {
-                  if (_glassesFilled < _targetGlasses) {
+              // Action Badge / Button
+              if (!isGoalMet)
+                InkWell(
+                  onTap: () {
                     _setGlassCount(_glassesFilled + 1);
-                  } else {
-                    _setGlassCount(0); // Reset
-                  }
-                },
-                borderRadius: BorderRadius.circular(14),
-                child: Container(
+                  },
+                  borderRadius: BorderRadius.circular(14),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.add_rounded, color: Color(0xFF00F0FF), size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          '+1 Glass',
+                          style: TextStyle(
+                            color: Color(0xFF00F0FF),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                    color: const Color(0xFF10B981).withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
+                    border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        _glassesFilled < _targetGlasses ? Icons.add_rounded : Icons.refresh_rounded,
-                        color: const Color(0xFF00F0FF),
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
+                      Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 15),
+                      SizedBox(width: 4),
                       Text(
-                        _glassesFilled < _targetGlasses ? '+1 Glass' : 'Reset',
-                        style: const TextStyle(
-                          color: Color(0xFF00F0FF),
+                        'Goal Met! ✨',
+                        style: TextStyle(
+                          color: Color(0xFF10B981),
                           fontSize: 11.5,
                           fontWeight: FontWeight.w700,
                         ),
@@ -185,7 +258,6 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
                     ],
                   ),
                 ),
-              ),
             ],
           ),
 
@@ -212,11 +284,8 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
 
               return GestureDetector(
                 onTap: () {
-                  if (index + 1 == _glassesFilled) {
-                    _setGlassCount(index);
-                  } else {
-                    _setGlassCount(index + 1);
-                  }
+                  // Tapping a glass marks progress forward
+                  _setGlassCount(index + 1);
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 250),
@@ -248,28 +317,29 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
                   child: Stack(
                     alignment: Alignment.bottomCenter,
                     children: [
-                      // Water fill level
+                      // Water filling level animation
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         width: double.infinity,
                         height: isFilled ? 32 : 0,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF0284C7), Color(0xFF00F0FF)],
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
+                            colors: [Color(0xFF00F0FF), Color(0xFF0284C7)],
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
                           ),
-                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                          borderRadius: const BorderRadius.vertical(
+                            bottom: Radius.circular(8),
+                          ),
                         ),
                       ),
                       Center(
-                        child: Text(
-                          isFilled ? '💧' : '${index + 1}',
-                          style: TextStyle(
-                            fontSize: isFilled ? 13 : 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: isFilled ? Colors.white : kSubtextColor,
-                          ),
+                        child: Icon(
+                          Icons.water_drop_rounded,
+                          size: 14,
+                          color: isFilled
+                              ? Colors.white
+                              : (isDark ? const Color(0xFF1E2D48) : const Color(0xFFCBD5E1)),
                         ),
                       ),
                     ],
@@ -278,10 +348,25 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> {
               );
             }),
           ),
+
+          const SizedBox(height: 10),
+
+          // Subtext info explaining automatic midnight reset
+          Center(
+            child: Text(
+              isGoalMet
+                  ? 'Awesome! Goal completed. Resets automatically at 12:00 AM midnight 🌙'
+                  : 'Tap glasses as you drink. Resets automatically at 12:00 AM midnight 🌙',
+              style: TextStyle(
+                color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                fontSize: 10.5,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ),
         ],
       ),
     );
   }
-
-  String get glassesFilledCount => '$_glassesFilled/$_targetGlasses glasses';
 }

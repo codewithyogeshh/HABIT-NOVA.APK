@@ -23,6 +23,8 @@ import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/widgets/alarm_ringing_dialog.dart';
 import 'package:synvero/core/widgets/animated_splash_screen.dart';
 import 'package:synvero/core/services/avatar_service.dart';
+import 'package:synvero/features/statistics/presentation/statistics_screen.dart';
+import 'package:synvero/features/leaderboard/presentation/leaderboard_screen.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
@@ -275,6 +277,10 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return MaterialPageRoute(builder: (context) => const NutritionScreen());
           case '/fitness':
             return MaterialPageRoute(builder: (context) => const FitnessScreen());
+          case '/statistics':
+            return MaterialPageRoute(builder: (context) => const StatisticsScreen());
+          case '/leaderboard':
+            return MaterialPageRoute(builder: (context) => const LeaderboardScreen());
           default:
             // If already authenticated, show dashboard
             if (_isAuthenticated) {
