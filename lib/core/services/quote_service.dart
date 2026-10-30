@@ -148,3 +148,4 @@ class QuoteService {
   /// Get current quote
   static MotivationalQuote get currentQuote => currentQuoteNotifier.value;
 }
+

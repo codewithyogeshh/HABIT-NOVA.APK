@@ -1,24 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/chat_history_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/features/ai_assistant/data/gemini_ai_service.dart';
 import 'package:synvero/features/ai_assistant/domain/ai_response_engine.dart';
-
-/// Chat message model for AI assistant conversations.
-class ChatMessage {
-  final String id;
-  final String text;
-  final bool isUser;
-  final String time;
-
-  ChatMessage({
-    String? id,
-    required this.text,
-    required this.isUser,
-    required this.time,
-  }) : id = id ?? 'msg-${DateTime.now().microsecondsSinceEpoch}';
-}
 
 /// AI Assistant screen.
 ///
@@ -114,19 +100,23 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     'Weekly goal review',
   ];
 
+  bool _isLoadingHistory = true;
+
   @override
   void initState() {
     super.initState();
-    final user = SupabaseService.user;
-    final name = (user?.userMetadata?['username'] as String?) ??
-        (user?.email != null && user!.email!.isNotEmpty ? user.email!.split('@').first : 'Friend');
-    _messages.add(
-      ChatMessage(
-        text: "Hi $name! 👋 I'm your AI assistant. How can I help you today?",
-        isUser: false,
-        time: _currentTimeString(),
-      ),
-    );
+    _loadChatHistory();
+  }
+
+  Future<void> _loadChatHistory() async {
+    final history = await ChatHistoryService.loadHistory();
+    if (!mounted) return;
+    setState(() {
+      _messages.clear();
+      _messages.addAll(history);
+      _isLoadingHistory = false;
+    });
+    _scrollToBottom();
   }
 
   @override
@@ -173,6 +163,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     });
     _messageController.clear();
     _scrollToBottom();
+    await ChatHistoryService.saveHistory(_messages);
 
     final user = SupabaseService.user;
     final userName = (user?.userMetadata?['username'] as String?) ??
@@ -198,6 +189,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         );
       });
       _scrollToBottom();
+      await ChatHistoryService.saveHistory(_messages);
     } catch (_) {
       if (!mounted) return;
       final fallbackReply = AIResponseEngine.getResponse(
@@ -216,6 +208,68 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         );
       });
       _scrollToBottom();
+      await ChatHistoryService.saveHistory(_messages);
+    }
+  }
+
+  Future<void> _showClearChatConfirmation() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF071728) : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Row(
+          children: [
+            Icon(Icons.delete_sweep_rounded, color: Color(0xFFEF4444)),
+            SizedBox(width: 8),
+            Text('Clear Chat History?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        content: const Text(
+          'Are you sure you want to clear your AI chat history? This cannot be undone.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Clear', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await ChatHistoryService.clearHistory();
+      final freshGreeting = await ChatHistoryService.loadHistory();
+      setState(() {
+        _messages.clear();
+        _messages.addAll(freshGreeting);
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 18),
+                SizedBox(width: 8),
+                Text('Chat history cleared!'),
+              ],
+            ),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: const Color(0xFF1E293B),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        );
+      }
     }
   }
 
@@ -434,6 +488,11 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         centerTitle: false,
         actions: [
           IconButton(
+            icon: const Icon(Icons.delete_outline_rounded, color: Color(0xFFEF4444), size: 22),
+            tooltip: 'Clear Chat History',
+            onPressed: _showClearChatConfirmation,
+          ),
+          IconButton(
             icon: const Icon(Icons.copy_all_rounded, color: kPrimaryColor, size: 22),
             tooltip: 'Copy Full Conversation',
             onPressed: _copyFullConversation,
@@ -494,7 +553,11 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
 
             // Chat Messages Stream
             Expanded(
-              child: ListView(
+              child: _isLoadingHistory
+                  ? const Center(
+                      child: CircularProgressIndicator(color: kPrimaryColor),
+                    )
+                  : ListView(
                 controller: _scrollController,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                 children: [
