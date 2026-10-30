@@ -9,6 +9,11 @@ import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/features/auth/data/auth_repository.dart';
+import 'package:synvero/core/services/gamification_service.dart';
+import 'package:synvero/features/dashboard/presentation/ai_coach_card.dart';
+import 'package:synvero/features/dashboard/presentation/weekly_heatmap_widget.dart';
+import 'package:synvero/features/dashboard/presentation/share_story_card_dialog.dart';
+import 'package:synvero/features/profile/presentation/badges_showcase_sheet.dart';
 
 /// Home Dashboard screen.
 ///
@@ -38,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _tasksDoneCount = 0;
   int _tasksTotalCount = 4;
   int _streakDays = 0;
+  int _totalXP = 150;
   final Map<String, bool> _habitCompletionMap = {};
 
   // Standard starter habits definition
@@ -139,6 +145,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _streakDays = completed > 0 ? 1 : 0;
       }
 
+      final xp = await GamificationService.loadXP(userId: currentUserId);
+      _totalXP = xp;
+
       // 5. Load user's actual profile/username without dummy fallback
       if (user != null) {
         final metaUsername = user.userMetadata?['username'] as String?;
@@ -191,12 +200,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (mounted) {
       if (newStatus) {
-        CelebrationDialog.show(
-          context,
-          title: 'Habit Completed! 🎉',
-          subtitle: habitName,
+        await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
+        final currentXP = await GamificationService.loadXP();
+        if (mounted) {
+          setState(() {
+            _totalXP = currentXP;
+          });
+        }
+        await GamificationService.checkAndAwardBadges(
           streakDays: _streakDays,
+          habitsCompletedToday: _completedHabitsCount,
+          waterGlassesToday: 4,
+          studySessionsToday: 0,
+          tasksDoneToday: _tasksDoneCount,
         );
+        if (mounted) {
+          CelebrationDialog.show(
+            context,
+            title: 'Habit Completed! 🎉',
+            subtitle: '$habitName (+50 XP)',
+            streakDays: _streakDays,
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -299,6 +324,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                         ),
                                       ),
                                     ],
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                InkWell(
+                                  onTap: () {
+                                    BadgesShowcaseSheet.show(context, currentXP: _totalXP, streakDays: _streakDays);
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.5), width: 1.0),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(GamificationService.getLevelInfo(_totalXP).badgeEmoji, style: const TextStyle(fontSize: 12)),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          'Lvl ${GamificationService.getLevelInfo(_totalXP).level} • ${GamificationService.getLevelInfo(_totalXP).title} ($_totalXP XP) 🏆',
+                                          style: const TextStyle(
+                                            color: Color(0xFF00F0FF),
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -449,16 +504,78 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 18),
 
-                      // Today's Progress Section Title
-                      Text(
-                        "Today's Progress",
-                        style: TextStyle(
-                          color: kTextColor,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      // AI Daily Morning Coach Card
+                      AICoachCard(
+                        username: displayName,
+                        streakDays: _streakDays,
+                        habitsCompletedToday: _completedHabitsCount,
+                        totalHabits: 5,
+                        onChatTapped: () {
+                          Navigator.of(context).pushNamed('/ai-assistant');
+                        },
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Weekly Consistency Heatmap
+                      WeeklyHeatmapWidget(streakDays: _streakDays),
+
+                      const SizedBox(height: 20),
+
+                      // Today's Progress Section Title with Share Story Action
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Today's Progress",
+                            style: TextStyle(
+                              color: kTextColor,
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () {
+                              final quote = QuoteService.currentQuote;
+                              ShareStoryCardDialog.show(
+                                context,
+                                username: displayName,
+                                streakDays: _streakDays,
+                                habitsCompleted: _completedHabitsCount,
+                                totalHabits: 5,
+                                totalXP: _totalXP,
+                                quoteText: quote.text,
+                                quoteAuthor: quote.author,
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.share_rounded, size: 13, color: Color(0xFF00F0FF)),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Share Story',
+                                    style: TextStyle(
+                                      color: Color(0xFF00F0FF),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
 

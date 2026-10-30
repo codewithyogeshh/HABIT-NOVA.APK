@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
 import 'package:synvero/features/profile/presentation/avatar_picker_sheet.dart';
+import 'package:synvero/core/services/gamification_service.dart';
+import 'package:synvero/features/profile/presentation/badges_showcase_sheet.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
@@ -47,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _notifTasks = true;
   int _streakDays = 0;
   String _selectedGender = 'male';
+  int _totalXP = 150;
 
   @override
   void initState() {
@@ -63,6 +66,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       final streak = prefs.getInt('user_${currentUserId}_streak_days') ?? 0;
       final gender = AvatarService.currentGender;
+      final xp = await GamificationService.loadXP(userId: currentUserId);
 
       if (user != null) {
         final metaUsername = user.userMetadata?['username'] as String?;
@@ -80,6 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           _streakDays = streak;
           _selectedGender = gender;
+          _totalXP = xp;
         });
       }
     } catch (_) {}
@@ -1547,6 +1552,126 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Trophies & Badges Showcase Card
+              Builder(
+                builder: (context) {
+                  final levelInfo = GamificationService.getLevelInfo(_totalXP);
+                  return InkWell(
+                    onTap: () {
+                      BadgesShowcaseSheet.show(context, currentXP: _totalXP, streakDays: _streakDays);
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            levelInfo.levelColor.withValues(alpha: 0.15),
+                            kCardBg,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: levelInfo.levelColor.withValues(alpha: 0.45)),
+                        boxShadow: [
+                          BoxShadow(
+                            color: levelInfo.levelColor.withValues(alpha: 0.1),
+                            blurRadius: 14,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: levelInfo.levelColor.withValues(alpha: 0.2),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: levelInfo.levelColor, width: 1.5),
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(levelInfo.badgeEmoji, style: const TextStyle(fontSize: 22)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          'Level ${levelInfo.level} • ${levelInfo.title}',
+                                          style: TextStyle(
+                                            color: levelInfo.levelColor,
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Text(
+                                          '$_totalXP XP',
+                                          style: TextStyle(
+                                            color: kDarkNavy,
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Trophy & Badges Showcase',
+                                      style: TextStyle(color: kSecondaryText, fontSize: 11.5),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Icon(Icons.chevron_right_rounded, color: levelInfo.levelColor, size: 20),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: LinearProgressIndicator(
+                              value: levelInfo.progress,
+                              minHeight: 6,
+                              backgroundColor: isDark ? const Color(0xFF030814) : const Color(0xFFE2E8F0),
+                              color: levelInfo.levelColor,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                '🏆 8 Badges to unlock',
+                                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF94A3B8)),
+                              ),
+                              Text(
+                                'Tap to View All ➔',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: levelInfo.levelColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
 
               const SizedBox(height: 20),

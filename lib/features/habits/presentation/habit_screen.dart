@@ -7,6 +7,9 @@ import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/task_service.dart';
 import 'package:synvero/features/habits/data/habit_repository.dart';
 import 'package:synvero/features/habits/data/models/habit_model.dart';
+import 'package:synvero/core/services/gamification_service.dart';
+import 'package:synvero/features/dashboard/presentation/weekly_heatmap_widget.dart';
+import 'package:synvero/features/habits/presentation/water_tracker_card.dart';
 
 /// Habit Tracker screen with real user-created upcoming schedules.
 class HabitScreen extends StatefulWidget {
@@ -164,16 +167,26 @@ class _HabitScreenState extends State<HabitScreen> {
       } catch (_) {}
     }
 
-    if (becameCompleted && mounted) {
+    if (becameCompleted) {
+      await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
       final doneCount = isRealDb
           ? _todayCompletion.values.where((v) => v).length
           : _defaultHabits.where((h) => h['completed'] == true).length;
-      CelebrationDialog.show(
-        context,
-        title: 'Habit Completed! 🎉',
-        subtitle: habitName,
+      await GamificationService.checkAndAwardBadges(
         streakDays: doneCount > 0 ? 1 : 0,
+        habitsCompletedToday: doneCount,
+        waterGlassesToday: 4,
+        studySessionsToday: 0,
+        tasksDoneToday: 0,
       );
+      if (mounted) {
+        CelebrationDialog.show(
+          context,
+          title: 'Habit Completed! 🎉',
+          subtitle: '$habitName (+50 XP)',
+          streakDays: doneCount > 0 ? 1 : 0,
+        );
+      }
     }
 
     // Update live progress on Android Home Widget
@@ -522,6 +535,16 @@ class _HabitScreenState extends State<HabitScreen> {
                           _buildFilterPill('Monthly', 2, isDark, kCardBg, kBorderColor),
                         ],
                       ),
+
+                      const SizedBox(height: 16),
+
+                      // Weekly Consistency Heatmap
+                      const WeeklyHeatmapWidget(streakDays: 1),
+
+                      const SizedBox(height: 16),
+
+                      // Interactive Water Tracker
+                      const WaterTrackerCard(),
 
                       const SizedBox(height: 20),
 

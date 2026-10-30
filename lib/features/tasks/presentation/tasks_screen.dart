@@ -1,4 +1,5 @@
 import 'package:synvero/core/widgets/celebration_dialog.dart';
+import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/notification_service.dart';
@@ -75,14 +76,20 @@ class _TasksScreenState extends State<TasksScreen> {
     final becameCompleted = !task.isCompleted;
     await TaskService.toggleTask(task);
     await _loadTasks();
-    if (becameCompleted && mounted) {
+    if (becameCompleted) {
+      await GamificationService.addXP(GamificationService.xpPerTask, reason: 'Completed Task');
       final doneCount = _tasks.where((t) => t.isCompleted).length;
-      CelebrationDialog.show(
-        context,
-        title: 'Task Completed! 🚀',
-        subtitle: task.title,
-        streakDays: doneCount,
-      );
+      if (doneCount >= 4) {
+        await GamificationService.unlockBadge('task_crusher');
+      }
+      if (mounted) {
+        CelebrationDialog.show(
+          context,
+          title: 'Task Completed! 🚀',
+          subtitle: '${task.title} (+30 XP)',
+          streakDays: doneCount,
+        );
+      }
     }
   }
 

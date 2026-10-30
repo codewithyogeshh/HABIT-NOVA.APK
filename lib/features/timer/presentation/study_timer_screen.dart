@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/gamification_service.dart';
+import 'package:synvero/core/services/focus_sound_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
+import 'package:synvero/features/timer/presentation/focus_sound_selector_widget.dart';
 
 /// Study Timer screen.
 ///
@@ -103,12 +106,15 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('user_${_currentUserId}_timer_completed_sessions', _completedSessions);
+      await GamificationService.addXP(GamificationService.xpPerStudyTimer, reason: 'Completed Focus Session');
+      await GamificationService.unlockBadge('focus_titan');
     } catch (_) {}
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    FocusSoundService.stopSound();
     super.dispose();
   }
 
@@ -742,7 +748,12 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                 ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Ambient Focus Sounds Selector
+              const FocusSoundSelectorWidget(),
+
+              const SizedBox(height: 20),
 
               // Daily Focus Stats Card
               Container(
