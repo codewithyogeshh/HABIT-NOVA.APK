@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/services/avatar_service.dart';
@@ -104,7 +105,21 @@ class UserAvatar extends StatelessWidget {
   }
 
   Widget _buildAvatarImage(String path) {
-    if (path.startsWith('http://') || path.startsWith('https://')) {
+    if (path.startsWith('data:image/') || path.startsWith('base64:')) {
+      try {
+        final base64String = path.contains(',') ? path.split(',').last : path.replaceFirst('base64:', '');
+        final bytes = base64Decode(base64String.trim());
+        return Image.memory(
+          bytes,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildFallbackAsset(),
+        );
+      } catch (_) {
+        return _buildFallbackAsset();
+      }
+    } else if (path.startsWith('http://') || path.startsWith('https://')) {
       return Image.network(
         path,
         width: size,

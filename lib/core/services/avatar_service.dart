@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
 /// Service to manage, persist, and isolate user profile avatars and gender
@@ -93,22 +95,39 @@ class AvatarService {
   }
 
   /// Loads profile avatar & gender strictly scoped to a specific user.
-  /// Prevents any data bleeding between different accounts.
+  /// Prevents any data bleeding between different accounts and guarantees cross-device sync.
   static Future<void> loadForUser(String userId) async {
     _activeUserId = userId;
     try {
       final prefs = await SharedPreferences.getInstance();
 
       // 1. Load user gender
-      final savedGender = prefs.getString(_genderKeyFor(userId)) ?? 'male';
+      String savedGender = prefs.getString(_genderKeyFor(userId)) ?? 'male';
+      String? savedAvatar = prefs.getString(_avatarKeyFor(userId));
+
+      // 2. Check Supabase Auth user metadata first (guarantees cross-device restore!)
+      final sbUser = SupabaseService.user;
+      if (sbUser != null) {
+        final metaAvatar = sbUser.userMetadata?['avatar_url'] as String?;
+        final metaGender = sbUser.userMetadata?['gender'] as String?;
+        if (metaGender != null && metaGender.isNotEmpty) {
+          savedGender = metaGender;
+          await prefs.setString(_genderKeyFor(userId), metaGender);
+        }
+        if (metaAvatar != null && metaAvatar.isNotEmpty) {
+          savedAvatar = metaAvatar;
+          await prefs.setString(_avatarKeyFor(userId), metaAvatar);
+        }
+      }
+
       currentGenderNotifier.value = savedGender;
 
-      // 2. Load user avatar
-      final savedAvatar = prefs.getString(_avatarKeyFor(userId));
-
       if (savedAvatar != null && savedAvatar.isNotEmpty) {
-        // Validate local file if applicable
-        if (!savedAvatar.startsWith('assets/') && !savedAvatar.startsWith('http')) {
+        // Validate local file if applicable (don't reject base64 or assets/urls)
+        if (!savedAvatar.startsWith('assets/') &&
+            !savedAvatar.startsWith('http') &&
+            !savedAvatar.startsWith('data:image/') &&
+            !savedAvatar.startsWith('base64:')) {
           if (!File(savedAvatar).existsSync()) {
             currentAvatarNotifier.value =
                 savedGender == 'female' ? defaultFemaleAvatar : defaultMaleAvatar;
@@ -177,6 +196,16 @@ class AvatarService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_avatarKeyFor(targetId), path);
 
+      // Cloud sync to Supabase Auth metadata (guarantees cross-device restore!)
+      try {
+        await SupabaseService.client.auth.updateUser(
+          UserAttributes(data: {
+            'avatar_url': path,
+            'gender': currentGenderNotifier.value,
+          }),
+        );
+      } catch (_) {}
+
       // Background cloud sync
       _syncAvatarToCloud(targetId, path);
     } catch (e) {
@@ -184,17 +213,19 @@ class AvatarService {
     }
   }
 
-  /// Pick custom image from gallery and persist
+  /// Pick custom image from gallery, compress to portable Base64 URI, and persist
   static Future<bool> pickFromGallery({String? userId}) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 88,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
       );
       if (pickedFile != null) {
-        await setAvatar(pickedFile.path, userId: userId);
+        final bytes = await pickedFile.readAsBytes();
+        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        await setAvatar(base64String, userId: userId);
         return true;
       }
     } catch (e) {
@@ -203,17 +234,19 @@ class AvatarService {
     return false;
   }
 
-  /// Take custom photo using camera and persist
+  /// Take custom photo using camera, compress to portable Base64 URI, and persist
   static Future<bool> pickFromCamera({String? userId}) async {
     try {
       final XFile? pickedFile = await _imagePicker.pickImage(
         source: ImageSource.camera,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        imageQuality: 88,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 75,
       );
       if (pickedFile != null) {
-        await setAvatar(pickedFile.path, userId: userId);
+        final bytes = await pickedFile.readAsBytes();
+        final base64String = 'data:image/jpeg;base64,${base64Encode(bytes)}';
+        await setAvatar(base64String, userId: userId);
         return true;
       }
     } catch (e) {

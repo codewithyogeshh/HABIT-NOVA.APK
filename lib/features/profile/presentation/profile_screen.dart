@@ -1795,6 +1795,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           Text(
                             _displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: kDarkNavy,
                               fontSize: 16,
@@ -1804,6 +1806,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const SizedBox(height: 2),
                           Text(
                             _displayEmail,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: kSecondaryText,
                               fontSize: 13,
@@ -1829,15 +1833,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     children: [
                                       Text(streakBadge.emoji, style: const TextStyle(fontSize: 12)),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        '${streakBadge.title} • ${_streakDays}d Streak',
-                                        style: TextStyle(
-                                          color: streakBadge.color,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                      Flexible(
+                                        child: Text(
+                                          '${streakBadge.title} • ${_streakDays}d',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: streakBadge.color,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 2),
                                       Icon(Icons.chevron_right_rounded, size: 12, color: streakBadge.color),
                                     ],
                                   ),
@@ -1849,6 +1857,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
 
+                    const SizedBox(width: 8),
+
                     // Edit Profile Button
                     InkWell(
                       onTap: () {
@@ -1856,7 +1866,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       },
                       borderRadius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(20),
@@ -1930,15 +1940,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   children: [
                                     Row(
                                       children: [
-                                        Text(
-                                          'Level ${levelInfo.level} • ${levelInfo.title}',
-                                          style: TextStyle(
-                                            color: levelInfo.levelColor,
-                                            fontSize: 14.5,
-                                            fontWeight: FontWeight.w800,
+                                        Expanded(
+                                          child: Text(
+                                            'Level ${levelInfo.level} • ${levelInfo.title}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              color: levelInfo.levelColor,
+                                              fontSize: 14.5,
+                                              fontWeight: FontWeight.w800,
+                                            ),
                                           ),
                                         ),
-                                        const Spacer(),
+                                        const SizedBox(width: 8),
                                         Text(
                                           '$_totalXP XP',
                                           style: TextStyle(
