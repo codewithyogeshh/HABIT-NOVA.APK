@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:synvero/core/navigation/app_navigator.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
@@ -29,6 +30,11 @@ import 'package:synvero/features/leaderboard/presentation/leaderboard_screen.dar
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Strictly lock app to portrait orientation so device system orientation lock is never disturbed
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+  ]);
 
   // Explicitly register Android SharedPreferences store
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {

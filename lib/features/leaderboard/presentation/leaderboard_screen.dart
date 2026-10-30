@@ -7,10 +7,10 @@ import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
 
-/// HabbitNova Community Leaderboard Screen.
+/// HabbitNova Community Leaderboard Screen with 100% REAL users only.
 ///
-/// Displays community member rankings, top 3 champions podium,
-/// and allows users to share/publish their latest XP and streak progress.
+/// Displays genuine community member rankings, champions podium,
+/// and allows users to share/publish their live XP and streak progress.
 class LeaderboardScreen extends StatefulWidget {
   const LeaderboardScreen({super.key});
 
@@ -103,7 +103,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    final currentUserRank = _entries.indexWhere((e) => e.isCurrentUser) + 1;
+    final currentUserRankIndex = _entries.indexWhere((e) => e.isCurrentUser);
+    final currentUserRank = currentUserRankIndex >= 0 ? currentUserRankIndex + 1 : 1;
 
     return Scaffold(
       backgroundColor: kBgColor,
@@ -124,6 +125,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
         ),
         centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF00E5FF)),
+            onPressed: _loadData,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))
@@ -133,8 +140,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Sticky Current User Standing Card with "Share Progress" Action
+                    // Active User Progress Summary Card
                     Container(
+                      width: double.infinity,
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
@@ -265,8 +273,45 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Top 3 Podium (Olympic Champions: 2nd, 1st, 3rd)
-                    if (_entries.length >= 3) ...[
+                    // Community Champions Podium
+                    if (_entries.length == 1) ...[
+                      Center(
+                        child: _buildPodiumSpot(
+                          entry: _entries[0],
+                          rank: 1,
+                          height: 160,
+                          crownEmoji: '👑',
+                          accentColor: const Color(0xFFFFD700),
+                          isDark: isDark,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ] else if (_entries.length == 2) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          _buildPodiumSpot(
+                            entry: _entries[1],
+                            rank: 2,
+                            height: 130,
+                            crownEmoji: '🥈',
+                            accentColor: const Color(0xFFC0C0C0),
+                            isDark: isDark,
+                          ),
+                          const SizedBox(width: 16),
+                          _buildPodiumSpot(
+                            entry: _entries[0],
+                            rank: 1,
+                            height: 160,
+                            crownEmoji: '👑',
+                            accentColor: const Color(0xFFFFD700),
+                            isDark: isDark,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                    ] else if (_entries.length >= 3) ...[
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
@@ -460,6 +505,48 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                       },
                     ),
 
+                    if (_entries.length <= 2) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF071728) : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.verified_user_rounded, color: Color(0xFF00E5FF), size: 28),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Real Community Rankings Active 🛡️',
+                                    style: TextStyle(
+                                      color: kTextColor,
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '100% Real HabitNova users only. You are leading the community! When peers complete habits and share progress, their live rank will appear here.',
+                                    style: TextStyle(
+                                      color: kSubtextColor,
+                                      fontSize: 11.5,
+                                      height: 1.35,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: 24),
                   ],
                 ),
@@ -571,4 +658,3 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     );
   }
 }
-

@@ -76,12 +76,27 @@ class AICoachCard extends StatelessWidget {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(7),
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: const Color(0xFF00F0FF).withValues(alpha: 0.4),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00F0FF).withValues(alpha: 0.25),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
-                      child: const Icon(Icons.auto_awesome_rounded, color: Color(0xFF00F0FF), size: 16),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.asset(
+                          'assets/images/ai_assistant_logo.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                     const SizedBox(width: 10),
                     Text(

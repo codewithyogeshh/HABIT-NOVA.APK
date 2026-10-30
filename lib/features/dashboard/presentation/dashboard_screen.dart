@@ -783,6 +783,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             _buildQuickActionButton(
                               icon: Icons.auto_awesome_rounded,
                               label: 'AI Assistant',
+                              imageAsset: 'assets/images/ai_assistant_logo.png',
                               color: const Color(0xFF6366F1),
                               bgColor: const Color(0xFFE0E7FF),
                               isDark: isDark,
@@ -1200,6 +1201,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required Color bgColor,
     required bool isDark,
     required VoidCallback onTap,
+    String? imageAsset,
   }) {
     return InkWell(
       onTap: onTap,
@@ -1212,9 +1214,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
             decoration: BoxDecoration(
               color: isDark ? const Color(0xFF071728) : bgColor,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
+              border: Border.all(
+                color: imageAsset != null
+                    ? const Color(0xFF00F0FF).withValues(alpha: 0.5)
+                    : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
+              ),
+              boxShadow: imageAsset != null
+                  ? [
+                      BoxShadow(
+                        color: const Color(0xFF00F0FF).withValues(alpha: 0.2),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : null,
             ),
-            child: Icon(icon, color: color, size: 28),
+            child: imageAsset != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      imageAsset,
+                      width: 58,
+                      height: 58,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Icon(icon, color: color, size: 28),
           ),
           const SizedBox(height: 6),
           Text(

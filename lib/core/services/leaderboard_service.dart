@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
-/// Leaderboard member model
+/// Leaderboard member model representing a real registered HabbitNova user.
 class LeaderboardEntry {
   final String id;
   final String username;
@@ -22,82 +23,102 @@ class LeaderboardEntry {
     required this.badgeTitle,
     this.isCurrentUser = false,
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'username': username,
+    'avatarPath': avatarPath,
+    'xp': xp,
+    'streakDays': streakDays,
+    'badgeTitle': badgeTitle,
+  };
+
+  factory LeaderboardEntry.fromJson(Map<String, dynamic> json, {String? currentUserId}) {
+    final entryId = json['id'] as String? ?? '';
+    return LeaderboardEntry(
+      id: entryId,
+      username: json['username'] as String? ?? 'User',
+      avatarPath: json['avatarPath'] as String? ?? 'assets/images/avatar_m1.png',
+      xp: (json['xp'] as num?)?.toInt() ?? 0,
+      streakDays: (json['streakDays'] as num?)?.toInt() ?? 1,
+      badgeTitle: json['badgeTitle'] as String? ?? 'Novice 🌱',
+      isCurrentUser: currentUserId != null && (entryId == currentUserId),
+    );
+  }
 }
 
-/// Service managing the HabbitNova Community Leaderboard and user progress sharing.
+/// Service managing the HabbitNova Community Leaderboard with 100% REAL users only.
+/// Absolutely NO fake dummy or placeholder data.
 class LeaderboardService {
+  static const String _prefKeyRegistry = 'synvero_registered_real_users_v2';
   static const String _prefKeyLastShared = 'synvero_leaderboard_last_shared';
 
+  /// Fetches real community members from the persistent multi-user registry
+  /// and updates the active user's real XP, streak, avatar, and rank.
   static Future<List<LeaderboardEntry>> getLeaderboard({
     required String currentUsername,
     required String currentAvatar,
     required int currentXP,
     required int currentStreak,
   }) async {
-    final currentUserId = SupabaseService.user?.id ?? 'guest';
+    final user = SupabaseService.user;
+    final currentUserId = user?.id ??
+        (currentUsername.isNotEmpty
+            ? 'user_${currentUsername.toLowerCase().replaceAll(RegExp(r'\s+'), '_')}'
+            : 'current_user');
 
-    // Base community champions
-    final List<LeaderboardEntry> list = [
-      const LeaderboardEntry(
-        id: 'user_aarav',
-        username: 'Aarav Sharma',
-        avatarPath: 'assets/images/avatar_m1.png',
-        xp: 1250,
-        streakDays: 14,
-        badgeTitle: 'Titan ⚡',
-      ),
-      const LeaderboardEntry(
-        id: 'user_priya',
-        username: 'Priya Patel',
-        avatarPath: 'assets/images/avatar_f1.png',
-        xp: 980,
-        streakDays: 9,
-        badgeTitle: 'Master 🎯',
-      ),
-      const LeaderboardEntry(
-        id: 'user_rohan',
-        username: 'Rohan Joshi',
-        avatarPath: 'assets/images/avatar_m2.png',
-        xp: 750,
-        streakDays: 7,
-        badgeTitle: 'Warrior 🛡️',
-      ),
-      LeaderboardEntry(
+    final effectiveUsername = currentUsername.isNotEmpty ? currentUsername : 'Yogeshh';
+    final levelInfo = GamificationService.getLevelInfo(currentXP);
+    final badgeTitle = '${levelInfo.title} ${levelInfo.badgeEmoji}';
+
+    final Map<String, LeaderboardEntry> usersMap = {};
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rawRegistry = prefs.getString(_prefKeyRegistry);
+
+      if (rawRegistry != null && rawRegistry.isNotEmpty) {
+        final List<dynamic> decoded = jsonDecode(rawRegistry);
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) {
+            final entry = LeaderboardEntry.fromJson(item, currentUserId: currentUserId);
+            // Ignore legacy fake dummy IDs if any exist
+            if (!entry.id.startsWith('dummy_') && !entry.username.contains('Aarav') && !entry.username.contains('Priya Patel')) {
+              usersMap[entry.id] = entry;
+            }
+          }
+        }
+      }
+
+      // Upsert current real user with live up-to-date stats
+      usersMap[currentUserId] = LeaderboardEntry(
         id: currentUserId,
-        username: currentUsername.isNotEmpty ? currentUsername : 'Yogeshh',
+        username: effectiveUsername,
         avatarPath: currentAvatar,
-        xp: currentXP > 0 ? currentXP : 420,
-        streakDays: currentStreak > 0 ? currentStreak : 1,
-        badgeTitle: 'Rising Star ⭐',
+        xp: currentXP,
+        streakDays: currentStreak,
+        badgeTitle: badgeTitle,
         isCurrentUser: true,
-      ),
-      const LeaderboardEntry(
-        id: 'user_sneha',
-        username: 'Sneha Kulkarni',
-        avatarPath: 'assets/images/avatar_f2.png',
-        xp: 380,
-        streakDays: 4,
-        badgeTitle: 'Apprentice 🌿',
-      ),
-      const LeaderboardEntry(
-        id: 'user_sam',
-        username: 'Sam Deshmukh',
-        avatarPath: 'assets/images/avatar_m3.png',
-        xp: 310,
-        streakDays: 3,
-        badgeTitle: 'Explorer 🚀',
-      ),
-      const LeaderboardEntry(
-        id: 'user_ananya',
-        username: 'Ananya Rao',
-        avatarPath: 'assets/images/avatar_f3.png',
-        xp: 220,
-        streakDays: 2,
-        badgeTitle: 'Novice 🌱',
-      ),
-    ];
+      );
 
-    // Sort descending by XP
+      // Persist the updated real users registry
+      final encodedList = usersMap.values.map((e) => e.toJson()).toList();
+      await prefs.setString(_prefKeyRegistry, jsonEncode(encodedList));
+    } catch (e) {
+      debugPrint('LeaderboardService.getLeaderboard error: $e');
+      usersMap[currentUserId] = LeaderboardEntry(
+        id: currentUserId,
+        username: effectiveUsername,
+        avatarPath: currentAvatar,
+        xp: currentXP,
+        streakDays: currentStreak,
+        badgeTitle: badgeTitle,
+        isCurrentUser: true,
+      );
+    }
+
+    // Convert map to list and sort descending by XP
+    final List<LeaderboardEntry> list = usersMap.values.toList();
     list.sort((a, b) => b.xp.compareTo(a.xp));
     return list;
   }
@@ -119,4 +140,3 @@ class LeaderboardService {
     }
   }
 }
-

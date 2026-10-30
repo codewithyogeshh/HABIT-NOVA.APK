@@ -311,12 +311,21 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(8),
+                        width: 32,
+                        height: 32,
                         decoration: BoxDecoration(
-                          color: kPrimaryColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFF00F0FF).withValues(alpha: 0.4),
+                          ),
                         ),
-                        child: const Icon(Icons.auto_awesome_rounded, color: kPrimaryColor, size: 20),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.asset(
+                            'assets/images/ai_assistant_logo.png',
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                       ),
                       const SizedBox(width: 10),
                       Text(
@@ -463,24 +472,67 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
             }
           },
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Row(
           children: [
-            Text(
-              'AI Assistant',
-              style: TextStyle(
-                color: kTextColor,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.3,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFF00F0FF).withValues(alpha: 0.5),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00F0FF).withValues(alpha: 0.2),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Image.asset(
+                  'assets/images/ai_assistant_logo.png',
+                  fit: BoxFit.cover,
+                ),
               ),
             ),
-            Text(
-              'Your personal AI companion',
-              style: TextStyle(
-                color: kSubtextColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'AI Assistant',
+                    style: TextStyle(
+                      color: kTextColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        'Online • HabbitNova Coach',
+                        style: TextStyle(
+                          color: kSubtextColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -820,13 +872,23 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E2D48) : const Color(0xFFDBEAFE),
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF00F0FF).withValues(alpha: 0.35),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00F0FF).withValues(alpha: 0.2),
+                      blurRadius: 6,
+                    ),
+                  ],
                 ),
-                child: const Icon(
-                  Icons.auto_awesome_rounded,
-                  color: kPrimaryColor,
-                  size: 16,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/images/ai_assistant_logo.png',
+                    fit: BoxFit.cover,
+                  ),
                 ),
               ),
               Expanded(
