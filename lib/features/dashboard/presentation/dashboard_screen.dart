@@ -12,7 +12,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
-import 'package:synvero/features/auth/data/auth_repository.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/features/dashboard/presentation/ai_coach_card.dart';
 import 'package:synvero/features/dashboard/presentation/weekly_heatmap_widget.dart';
@@ -38,7 +37,6 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
-  final _authRepository = AuthRepository();
   String? _username;
   bool _isLoading = true;
   int _currentTabIndex = 0;
@@ -188,17 +186,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       // 5. Load user's actual profile/username without dummy fallback
       if (user != null) {
         final metaUsername = user.userMetadata?['username'] as String?;
-        if (metaUsername != null && metaUsername.isNotEmpty) {
-          _username = metaUsername;
+        if (metaUsername != null && metaUsername.trim().isNotEmpty) {
+          _username = metaUsername.trim();
+        } else if (user.email != null && user.email!.trim().isNotEmpty) {
+          _username = user.email!.split('@').first.trim();
         } else {
-          try {
-            final profile = await _authRepository.getProfile(userId: user.id);
-            _username = profile['username'] as String?;
-          } catch (_) {}
+          _username = 'User';
         }
-        if ((_username == null || _username!.isEmpty) && user.email != null && user.email!.isNotEmpty) {
-          _username = user.email!.split('@').first;
-        }
+        await prefs.setString('user_name', _username!);
+      } else {
+        _username = 'User';
       }
     } catch (_) {
       // Graceful fallback

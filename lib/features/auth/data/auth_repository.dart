@@ -64,6 +64,9 @@ class AuthRepository {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('is_user_logged_in', false);
       await prefs.remove('logged_in_user_id');
+      await prefs.remove('user_name');
+      await prefs.remove('user_email');
+      await prefs.remove('user_avatar');
       await SupabaseService.signOut();
     } on AuthException catch (e) {
       throw _mapAuthException(e);

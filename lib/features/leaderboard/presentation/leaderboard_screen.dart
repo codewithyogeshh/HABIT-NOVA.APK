@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/services/avatar_service.dart';
@@ -25,8 +26,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   List<LeaderboardEntry> _entries = [];
   int _userXP = 0;
-  final int _userStreak = 1;
-  String _username = 'Yogeshh';
+  int _userStreak = 1;
+  String _username = 'User';
   String _avatarPath = 'assets/images/avatar_m1.png';
 
   @override
@@ -40,16 +41,24 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     try {
       final user = SupabaseService.user;
       final currentUserId = user?.id ?? 'guest';
+      final prefs = await SharedPreferences.getInstance();
 
       _userXP = await GamificationService.loadXP(userId: currentUserId);
+      _userStreak = prefs.getInt('user_${currentUserId}_streak_days') ??
+          prefs.getInt('app_streak_days') ??
+          1;
 
       if (user != null) {
         final metaName = user.userMetadata?['username'] as String?;
-        if (metaName != null && metaName.isNotEmpty) {
-          _username = metaName;
-        } else if (user.email != null && user.email!.isNotEmpty) {
-          _username = user.email!.split('@').first;
+        if (metaName != null && metaName.trim().isNotEmpty) {
+          _username = metaName.trim();
+        } else if (user.email != null && user.email!.trim().isNotEmpty) {
+          _username = user.email!.split('@').first.trim();
+        } else {
+          _username = 'User';
         }
+      } else {
+        _username = 'User';
       }
 
       _avatarPath = AvatarService.currentAvatarNotifier.value;
