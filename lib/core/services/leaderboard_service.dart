@@ -259,6 +259,54 @@ class LeaderboardService {
     }
   }
 
+  /// Syncs current user's profile info (avatar, XP, streak, username) to the cloud leaderboard.
+  /// Called on signup, login, avatar updates, and task/habit completion.
+  static Future<void> syncCurrentUser({
+    String? username,
+    String? avatarPath,
+    int? xp,
+    int? streak,
+  }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final sbUser = SupabaseService.user;
+      final effectiveName = username ??
+          (sbUser?.userMetadata?['username'] as String?) ??
+          prefs.getString('user_name') ??
+          (sbUser?.email != null ? sbUser!.email!.split('@').first : 'User');
+
+      final effectiveAvatar = avatarPath ??
+          prefs.getString('user_avatar') ??
+          (sbUser?.userMetadata?['avatar_url'] as String?) ??
+          'assets/images/avatar_m1.png';
+
+      final effectiveXP = xp ??
+          (GamificationService.totalXPNotifier.value > 0
+              ? GamificationService.totalXPNotifier.value
+              : 150);
+
+      final effectiveStreak = streak ??
+          prefs.getInt('app_streak_days') ??
+          prefs.getInt('user_${sbUser?.id ?? "guest"}_streak_days') ??
+          1;
+
+      final currentUserId = resolveUserId(username: effectiveName);
+      final levelInfo = GamificationService.getLevelInfo(effectiveXP);
+      final badgeTitle = '${levelInfo.title} ${levelInfo.badgeEmoji}';
+
+      await _syncUserToCloud(
+        id: currentUserId,
+        username: effectiveName,
+        avatarPath: effectiveAvatar,
+        xp: effectiveXP,
+        streakDays: effectiveStreak,
+        badgeTitle: badgeTitle,
+      );
+    } catch (e) {
+      debugPrint('LeaderboardService.syncCurrentUser error: $e');
+    }
+  }
+
   /// Publishes user's latest progress to the HabitNova community leaderboard.
   /// Awards +25 XP bonus for participating!
   static Future<bool> publishUserProgress() async {

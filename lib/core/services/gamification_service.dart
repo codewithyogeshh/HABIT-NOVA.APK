@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
 /// Represents a gamification achievement badge in HabbitNova.
@@ -191,6 +192,9 @@ class GamificationService {
       if (leveledUp && newLevel >= 10) {
         await unlockBadge('nova_grandmaster', userId: uid);
       }
+
+      // Sync updated XP immediately to Cloud Leaderboard in background
+      LeaderboardService.syncCurrentUser(xp: newXP);
 
       return leveledUp;
     } catch (e) {

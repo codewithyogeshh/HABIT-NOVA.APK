@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
 /// Service to manage, persist, and isolate user profile avatars and gender
@@ -208,6 +209,9 @@ class AvatarService {
 
       // Background cloud sync
       _syncAvatarToCloud(targetId, path);
+
+      // Sync to Community Leaderboard in cloud so all friends see new photo immediately
+      LeaderboardService.syncCurrentUser(avatarPath: path);
     } catch (e) {
       debugPrint('AvatarService.setAvatar error: $e');
     }

@@ -4,10 +4,12 @@ import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_android/shared_preferences_android.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:synvero/app/theme/app_theme.dart';
 import 'package:synvero/core/config/supabase_config.dart';
+import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/features/auth/data/auth_repository.dart';
 import 'package:synvero/features/auth/presentation/login_screen.dart';
 import 'package:synvero/features/auth/presentation/signup_screen.dart';
@@ -218,6 +220,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final user = SupabaseService.user;
       if (user != null) {
         await AvatarService.loadForUser(user.id);
+        final metaUsername = user.userMetadata?['username'] as String?;
+        final effectiveName = (metaUsername != null && metaUsername.isNotEmpty)
+            ? metaUsername
+            : email.split('@').first;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_name', effectiveName);
+        await prefs.setString('user_email', email);
+        LeaderboardService.syncCurrentUser(username: effectiveName);
       }
       setState(() {
         _isAuthenticated = true;
@@ -240,6 +250,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
         password: password,
         username: username,
       );
+      final user = SupabaseService.user;
+      if (user != null) {
+        await AvatarService.loadForUser(user.id);
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_name', username);
+      await prefs.setString('user_email', email);
+
+      // Register new user on Cloud Leaderboard right away!
+      LeaderboardService.syncCurrentUser(
+        username: username,
+        xp: 150,
+        streak: 1,
+        avatarPath: AvatarService.currentAvatarNotifier.value,
+      );
+
       setState(() {
         _isAuthenticated = true;
       });
