@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:synvero/core/services/focus_sound_service.dart';
 
-/// Ambient focus sound selector bar embedded in the Study Timer.
+/// Ambient focus sound selector bar embedded in the Study Timer with authentic recordings.
 class FocusSoundSelectorWidget extends StatelessWidget {
   const FocusSoundSelectorWidget({super.key});
 
@@ -17,6 +17,12 @@ class FocusSoundSelectorWidget extends StatelessWidget {
       valueListenable: FocusSoundService.currentSoundIdNotifier,
       builder: (context, currentSoundId, _) {
         final isPlaying = currentSoundId != null;
+        final selectedOption = isPlaying
+            ? FocusSoundService.options.firstWhere(
+                (o) => o.id == currentSoundId,
+                orElse: () => FocusSoundService.options.first,
+              )
+            : null;
 
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -57,13 +63,27 @@ class FocusSoundSelectorWidget extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        'Ambient Focus Sounds',
-                        style: TextStyle(
-                          color: kTextColor,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Real Focus Sounds 🎧',
+                            style: TextStyle(
+                              color: kTextColor,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (selectedOption != null)
+                            Text(
+                              selectedOption.subtitle,
+                              style: const TextStyle(
+                                color: Color(0xFF00F0FF),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -146,6 +166,38 @@ class FocusSoundSelectorWidget extends StatelessWidget {
                   }).toList(),
                 ),
               ),
+
+              // Volume Slider when playing
+              if (isPlaying) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.volume_down_rounded, size: 15, color: Color(0xFF94A3B8)),
+                    Expanded(
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: FocusSoundService.volumeNotifier,
+                        builder: (context, vol, _) {
+                          return SliderTheme(
+                            data: SliderTheme.of(context).copyWith(
+                              activeTrackColor: const Color(0xFF00F0FF),
+                              inactiveTrackColor: isDark ? const Color(0xFF030814) : const Color(0xFFE2E8F0),
+                              thumbColor: const Color(0xFF00F0FF),
+                              overlayColor: const Color(0xFF00F0FF).withValues(alpha: 0.2),
+                              trackHeight: 3,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                            ),
+                            child: Slider(
+                              value: vol,
+                              onChanged: (v) => FocusSoundService.setVolume(v),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const Icon(Icons.volume_up_rounded, size: 15, color: Color(0xFF00F0FF)),
+                  ],
+                ),
+              ],
             ],
           ),
         );

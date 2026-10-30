@@ -5,9 +5,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
-import android.media.AudioFormat
-import android.media.AudioManager
-import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Build
@@ -18,8 +15,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugins.GeneratedPluginRegistrant
-import java.util.Random
-import kotlin.math.sin
 
 class MainActivity : FlutterActivity() {
     private val WIDGET_CHANNEL = "com.example.synvero/widget"
@@ -30,11 +25,9 @@ class MainActivity : FlutterActivity() {
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
 
-    // Ambient Focus Audio generator
-    private var focusAudioTrack: AudioTrack? = null
-    private var focusSoundThread: Thread? = null
-    @Volatile private var isFocusPlaying = false
-    @Volatile private var focusVolume = 0.7f
+    // Ambient Focus Real Field Recording Player
+    private var focusMediaPlayer: MediaPlayer? = null
+    @Volatile private var focusVolume = 0.8f
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -114,12 +107,12 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // 3. Focus Sounds Channel (Rain, Ocean, Forest, Cafe, White Noise)
+        // 3. Focus Sounds Channel (Real Natural Recordings: Rain, Ocean Waves, Birds, Cafe, Campfire)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FOCUS_SOUND_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
                 "playFocusSound" -> {
                     val soundType = call.argument<String>("type") ?: "rain"
-                    val vol = (call.argument<Double>("volume") ?: 0.7).toFloat()
+                    val vol = (call.argument<Double>("volume") ?: 0.8).toFloat()
                     focusVolume = vol.coerceIn(0.0f, 1.0f)
                     startFocusSound(soundType)
                     result.success(true)
@@ -129,10 +122,10 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "setFocusVolume" -> {
-                    val vol = (call.argument<Double>("volume") ?: 0.7).toFloat()
+                    val vol = (call.argument<Double>("volume") ?: 0.8).toFloat()
                     focusVolume = vol.coerceIn(0.0f, 1.0f)
                     try {
-                        focusAudioTrack?.setVolume(focusVolume)
+                        focusMediaPlayer?.setVolume(focusVolume, focusVolume)
                     } catch (e: Exception) {}
                     result.success(true)
                 }
@@ -165,112 +158,38 @@ class MainActivity : FlutterActivity() {
 
     private fun startFocusSound(type: String) {
         stopFocusSound()
-        isFocusPlaying = true
-
-        focusSoundThread = Thread {
-            val sampleRate = 22050
-            val minBufSize = AudioTrack.getMinBufferSize(
-                sampleRate,
-                AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT
-            )
-            val bufferSize = if (minBufSize > 4096) minBufSize else 4096
-
-            focusAudioTrack = AudioTrack(
-                AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_MEDIA)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                    .build(),
-                AudioFormat.Builder()
-                    .setSampleRate(sampleRate)
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                    .build(),
-                bufferSize * 2,
-                AudioTrack.MODE_STREAM,
-                AudioManager.AUDIO_SESSION_ID_GENERATE
-            )
-
-            try {
-                focusAudioTrack?.setVolume(focusVolume)
-                focusAudioTrack?.play()
-            } catch (e: Exception) {
-                return@Thread
+        try {
+            val resId = when (type.lowercase()) {
+                "rain" -> R.raw.focus_rain
+                "ocean", "waves" -> R.raw.focus_ocean
+                "forest", "birds" -> R.raw.focus_forest
+                "cafe" -> R.raw.focus_cafe
+                "campfire" -> R.raw.focus_campfire
+                else -> R.raw.focus_rain
             }
 
-            val random = Random()
-            val buffer = ShortArray(bufferSize)
-            var lastSample = 0.0
-            var phase = 0.0
-            val phaseInc = 2.0 * Math.PI * 0.15 / sampleRate // Slow 0.15Hz wave cycle
-
-            while (isFocusPlaying) {
-                for (i in 0 until bufferSize) {
-                    val rawNoise = (random.nextDouble() * 2.0 - 1.0)
-                    val sample: Double
-
-                    when (type) {
-                        "rain" -> {
-                            // Pink noise with slight high-frequency filtering (soothing raindrops)
-                            lastSample = 0.88 * lastSample + 0.12 * rawNoise
-                            sample = lastSample * 0.35
-                        }
-                        "ocean" -> {
-                            // Pink noise modulated by gentle 0.15 Hz sinusoidal wave (ocean tide)
-                            lastSample = 0.92 * lastSample + 0.08 * rawNoise
-                            val wave = (sin(phase) + 1.2) * 0.5
-                            sample = lastSample * wave * 0.45
-                            phase += phaseInc
-                            if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI
-                        }
-                        "forest" -> {
-                            // Low wind breeze + subtle chirps
-                            lastSample = 0.94 * lastSample + 0.06 * rawNoise
-                            val chirp = if (random.nextInt(6000) == 0) sin(phase * 18.0) * 0.1 else 0.0
-                            sample = (lastSample * 0.3) + chirp
-                            phase += phaseInc
-                        }
-                        "cafe" -> {
-                            // Warm filtered brown noise
-                            lastSample = 0.95 * lastSample + 0.05 * rawNoise
-                            sample = lastSample * 0.4
-                        }
-                        else -> {
-                            // Smooth white noise
-                            lastSample = 0.5 * lastSample + 0.5 * rawNoise
-                            sample = lastSample * 0.25
-                        }
-                    }
-
-                    val intSample = (sample * 32767.0).toInt().coerceIn(-32768, 32767)
-                    buffer[i] = intSample.toShort()
-                }
-
-                if (!isFocusPlaying) break
-                focusAudioTrack?.write(buffer, 0, bufferSize)
+            focusMediaPlayer = MediaPlayer.create(this, resId)?.apply {
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                isLooping = true
+                setVolume(focusVolume, focusVolume)
+                start()
             }
-
-            try {
-                focusAudioTrack?.stop()
-                focusAudioTrack?.release()
-            } catch (e: Exception) {}
-            focusAudioTrack = null
-        }.apply {
-            priority = Thread.MIN_PRIORITY
-            start()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
     private fun stopFocusSound() {
-        isFocusPlaying = false
-        focusSoundThread?.interrupt()
-        focusSoundThread = null
-
         try {
-            focusAudioTrack?.stop()
-            focusAudioTrack?.release()
+            focusMediaPlayer?.stop()
+            focusMediaPlayer?.release()
         } catch (e: Exception) {}
-        focusAudioTrack = null
+        focusMediaPlayer = null
     }
 
     private fun startAlarm() {

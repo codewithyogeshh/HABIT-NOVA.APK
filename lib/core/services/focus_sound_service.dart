@@ -17,43 +17,43 @@ class FocusSoundOption {
   });
 }
 
-/// Service managing relaxing ambient focus sounds for the Study Timer.
+/// Service managing authentic real-world ambient focus sounds for the Study Timer.
 class FocusSoundService {
   static const MethodChannel _channel = MethodChannel('com.example.synvero/focus_sounds');
 
   static final ValueNotifier<String?> currentSoundIdNotifier = ValueNotifier<String?>(null);
-  static final ValueNotifier<double> volumeNotifier = ValueNotifier<double>(0.7);
+  static final ValueNotifier<double> volumeNotifier = ValueNotifier<double>(0.8);
 
   static const List<FocusSoundOption> options = [
     FocusSoundOption(
       id: 'rain',
-      name: 'Gentle Rain',
+      name: 'Real Rain',
       iconEmoji: '🌧️',
-      subtitle: 'Calming steady raindrops',
+      subtitle: 'खरा पाऊस • Rain on window glass',
     ),
     FocusSoundOption(
       id: 'ocean',
       name: 'Ocean Waves',
       iconEmoji: '🌊',
-      subtitle: 'Rhythmic deep sea tides',
+      subtitle: 'समुद्राच्या लाटा • Deep ocean surf',
     ),
     FocusSoundOption(
       id: 'forest',
-      name: 'Forest Zen',
+      name: 'Forest Birds',
       iconEmoji: '🌲',
-      subtitle: 'Nature breeze & gentle birds',
+      subtitle: 'निसर्गातील पक्षी • Birds in green trees',
     ),
     FocusSoundOption(
       id: 'cafe',
-      name: 'Cafe Ambiance',
+      name: 'Cozy Cafe',
       iconEmoji: '☕',
-      subtitle: 'Cozy coffee shop background',
+      subtitle: 'कॅफे व्हायब्स • Coffee shop atmosphere',
     ),
     FocusSoundOption(
-      id: 'whitenoise',
-      name: 'Deep Focus Noise',
-      iconEmoji: '🧘',
-      subtitle: 'Blocks out all distractions',
+      id: 'campfire',
+      name: 'Campfire',
+      iconEmoji: '🔥',
+      subtitle: 'शेकोटीचा आवाज • Warm crackling fire',
     ),
   ];
 
@@ -95,4 +95,3 @@ class FocusSoundService {
     }
   }
 }
-
