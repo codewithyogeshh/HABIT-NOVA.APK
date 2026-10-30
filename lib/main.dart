@@ -26,6 +26,7 @@ import 'package:synvero/core/widgets/animated_splash_screen.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 import 'package:synvero/features/statistics/presentation/statistics_screen.dart';
 import 'package:synvero/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:synvero/core/services/language_service.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
@@ -46,6 +47,12 @@ void main() async {
   }
 
   // Defensively initialize services so startup never results in a black screen
+  try {
+    await LanguageService.init();
+  } catch (e) {
+    debugPrint('LanguageService.init error: $e');
+  }
+
   try {
     await ThemeService.init();
   } catch (e, st) {

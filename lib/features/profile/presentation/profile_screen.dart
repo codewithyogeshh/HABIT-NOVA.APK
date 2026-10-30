@@ -13,6 +13,7 @@ import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/theme_service.dart';
 import 'package:synvero/features/auth/data/auth_repository.dart';
+import 'package:synvero/core/services/language_service.dart';
 
 /// Profile & Settings Screen.
 ///
@@ -110,12 +111,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to log out of Synvero?'),
+        title: Text(LanguageService.tr('log_out_confirm_title'), style: const TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(LanguageService.tr('log_out_confirm_msg')),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(LanguageService.tr('cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -123,7 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               backgroundColor: const Color(0xFFEF4444),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
-            child: const Text('Log Out', style: TextStyle(color: Colors.white)),
+            child: Text(LanguageService.tr('log_out'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -199,7 +200,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Select Your Gender / लिंग निवडा',
+                          LanguageService.tr('select_gender'),
                           style: TextStyle(
                             color: textColor,
                             fontSize: 18,
@@ -207,7 +208,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         Text(
-                          'Avatars will match your selected gender',
+                          LanguageService.tr('select_gender_subtitle'),
                           style: TextStyle(color: subtextColor, fontSize: 12.5),
                         ),
                       ],
@@ -228,10 +229,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         });
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Gender set to Male 👨! Choose your 3D avatar.'),
-                              backgroundColor: Color(0xFF0284C7),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(LanguageService.tr('gender_set_male')),
+                              backgroundColor: const Color(0xFF0284C7),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                           AvatarPickerSheet.show(context);
@@ -256,7 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const Text('👨', style: TextStyle(fontSize: 42)),
                             const SizedBox(height: 10),
                             Text(
-                              'Male (पुरुष)',
+                              LanguageService.tr('male'),
                               style: TextStyle(
                                 color: _selectedGender == 'male' ? const Color(0xFF00F0FF) : textColor,
                                 fontSize: 16,
@@ -265,7 +266,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '3D Male Avatars',
+                              LanguageService.tr('male_avatars'),
                               style: TextStyle(color: subtextColor, fontSize: 11),
                             ),
                           ],
@@ -284,10 +285,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         });
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Gender set to Female 👩! Choose your 3D avatar.'),
-                              backgroundColor: Color(0xFF0D9488),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(LanguageService.tr('gender_set_female')),
+                              backgroundColor: const Color(0xFF0D9488),
+                              duration: const Duration(seconds: 2),
                             ),
                           );
                           AvatarPickerSheet.show(context);
@@ -312,7 +313,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const Text('👩', style: TextStyle(fontSize: 42)),
                             const SizedBox(height: 10),
                             Text(
-                              'Female (स्त्री)',
+                              LanguageService.tr('female'),
                               style: TextStyle(
                                 color: _selectedGender == 'female' ? const Color(0xFF00F0FF) : textColor,
                                 fontSize: 16,
@@ -321,7 +322,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '3D Female Avatars',
+                              LanguageService.tr('female_avatars'),
                               style: TextStyle(color: subtextColor, fontSize: 11),
                             ),
                           ],
@@ -334,6 +335,329 @@ class _ProfileScreenState extends State<ProfileScreen> {
               const SizedBox(height: 20),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showQuickSettingsSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
+    final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: sheetBg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: borderColor),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.settings_rounded, color: Color(0xFF00F0FF), size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        LanguageService.tr('quick_settings'),
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    icon: Icon(Icons.close_rounded, color: subtextColor),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // App Language Option
+              _buildSettingsTile(
+                icon: Icons.translate_rounded,
+                iconColor: const Color(0xFF00F0FF),
+                iconBgColor: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE0F2FE),
+                title: LanguageService.tr('app_language'),
+                subtitle: LanguageService.tr('app_language_subtitle'),
+                trailingLabel: LanguageService.currentLanguageName,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showLanguageSelectionSheet();
+                },
+              ),
+              Divider(height: 1, indent: 64, endIndent: 16, color: borderColor.withValues(alpha: 0.5)),
+              // Theme Option
+              _buildSettingsTile(
+                icon: ThemeService.currentThemeMode == ThemeMode.dark
+                    ? Icons.dark_mode_outlined
+                    : Icons.wb_sunny_outlined,
+                iconColor: const Color(0xFF3B66FF),
+                iconBgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFDBEAFE),
+                title: LanguageService.tr('appearance'),
+                trailingLabel: ThemeService.currentThemeName,
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showThemeSelectionSheet();
+                },
+              ),
+              Divider(height: 1, indent: 64, endIndent: 16, color: borderColor.withValues(alpha: 0.5)),
+              // Notifications
+              _buildSettingsTile(
+                icon: Icons.notifications_none_rounded,
+                iconColor: const Color(0xFF10B981),
+                iconBgColor: isDark ? const Color(0xFF064E3B) : const Color(0xFFD1FAE5),
+                title: LanguageService.tr('notification_settings'),
+                trailingLabel: 'Manage',
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showNotificationSettingsSheet();
+                },
+              ),
+              Divider(height: 1, indent: 64, endIndent: 16, color: borderColor.withValues(alpha: 0.5)),
+              // Home Screen Widget
+              _buildSettingsTile(
+                icon: Icons.widgets_outlined,
+                iconColor: const Color(0xFF8B5CF6),
+                iconBgColor: isDark ? const Color(0xFF2E1065).withValues(alpha: 0.5) : const Color(0xFFF3E8FF),
+                title: LanguageService.tr('home_widget'),
+                trailingLabel: 'Add',
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showWidgetSettingsSheet();
+                },
+              ),
+              const SizedBox(height: 20),
+              // Prominent Log Out Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    _handleLogout();
+                  },
+                  icon: const Icon(Icons.logout_rounded, color: Colors.white, size: 18),
+                  label: Text(
+                    LanguageService.tr('log_out'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFEF4444),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showLanguageSelectionSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final sheetBg = isDark ? const Color(0xFF071728) : Colors.white;
+    final textColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
+    final subtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final borderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (bCtx, setModalState) {
+            final currentLang = LanguageService.currentLanguageCode;
+
+            Widget buildLangOption({
+              required String code,
+              required String name,
+              required String subname,
+              required String flagEmoji,
+            }) {
+              final isSelected = currentLang == code;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: InkWell(
+                  onTap: () async {
+                    final navigator = Navigator.of(ctx);
+                    final messenger = ScaffoldMessenger.of(context);
+                    HapticFeedback.selectionClick();
+                    await LanguageService.setLanguage(code);
+                    if (mounted) {
+                      setState(() {});
+                    }
+                    navigator.pop();
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Language set to $name ✨'),
+                        backgroundColor: const Color(0xFF0E223D),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? const Color(0xFF00F0FF).withValues(alpha: isDark ? 0.15 : 0.08)
+                          : (isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: isSelected ? const Color(0xFF00F0FF) : borderColor,
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(flagEmoji, style: const TextStyle(fontSize: 26)),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  color: isSelected ? const Color(0xFF00F0FF) : textColor,
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Text(
+                                subname,
+                                style: TextStyle(color: subtextColor, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (isSelected)
+                          const Icon(Icons.check_circle_rounded, color: Color(0xFF00F0FF), size: 22)
+                        else
+                          Icon(Icons.circle_outlined, color: subtextColor.withValues(alpha: 0.4), size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Container(
+              decoration: BoxDecoration(
+                color: sheetBg,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: borderColor),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.translate_rounded, color: Color(0xFF00F0FF), size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            LanguageService.tr('choose_language'),
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        icon: Icon(Icons.close_rounded, color: subtextColor),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  buildLangOption(
+                    code: LanguageService.english,
+                    name: 'English',
+                    subname: 'Default system language',
+                    flagEmoji: '🇬🇧',
+                  ),
+                  buildLangOption(
+                    code: LanguageService.marathi,
+                    name: 'मराठी',
+                    subname: 'मराठी भाषा निवडा',
+                    flagEmoji: '🇮🇳',
+                  ),
+                  buildLangOption(
+                    code: LanguageService.hindi,
+                    name: 'हिंदी',
+                    subname: 'हिंदी भाषा चुनें',
+                    flagEmoji: '🇮🇳',
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -1420,7 +1744,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     constraints: const BoxConstraints(),
                   ),
                   Text(
-                    'Profile & Settings',
+                    LanguageService.tr('profile_settings'),
                     style: TextStyle(
                       color: kDarkNavy,
                       fontSize: 18,
@@ -1429,9 +1753,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   IconButton(
                     icon: Icon(Icons.settings_outlined, color: kDarkNavy, size: 22),
-                    onPressed: () {
-                      _showNotice('Settings preferences already active');
-                    },
+                    onPressed: _showQuickSettingsSheet,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -1732,10 +2054,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       icon: Icons.wc_rounded,
                       iconColor: const Color(0xFF00F0FF),
                       iconBgColor: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE0F2FE),
-                      title: 'Gender (लिंग निवडा)',
-                      subtitle: 'Selected: ${_selectedGender == 'female' ? 'Female 👩' : 'Male 👨'} • Tap to switch',
-                      trailingLabel: _selectedGender == 'female' ? 'Female 👩' : 'Male 👨',
+                      title: LanguageService.tr('gender'),
+                      subtitle: '${LanguageService.tr('selected')}: ${_selectedGender == 'female' ? '${LanguageService.tr('female')} 👩' : '${LanguageService.tr('male')} 👨'} • Tap to switch',
+                      trailingLabel: _selectedGender == 'female' ? '${LanguageService.tr('female')} 👩' : '${LanguageService.tr('male')} 👨',
                       onTap: _showGenderSelectionSheet,
+                    ),
+                    Divider(height: 1, indent: 64, endIndent: 16, color: kDividerColor),
+                    _buildSettingsTile(
+                      icon: Icons.translate_rounded,
+                      iconColor: const Color(0xFF10B981),
+                      iconBgColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.5) : const Color(0xFFD1FAE5),
+                      title: LanguageService.tr('app_language'),
+                      subtitle: LanguageService.tr('app_language_subtitle'),
+                      trailingLabel: LanguageService.currentLanguageName,
+                      onTap: _showLanguageSelectionSheet,
                     ),
                     Divider(height: 1, indent: 64, endIndent: 16, color: kDividerColor),
                     _buildSettingsTile(
@@ -1872,9 +2204,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             size: 20,
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Log Out',
-                            style: TextStyle(
+                          Text(
+                            LanguageService.tr('log_out'),
+                            style: const TextStyle(
                               color: Color(0xFFEF4444),
                               fontSize: 15,
                               fontWeight: FontWeight.w700,

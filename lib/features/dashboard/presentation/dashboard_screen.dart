@@ -1,4 +1,6 @@
+import 'package:flutter/services.dart';
 import 'package:synvero/core/services/avatar_service.dart';
+import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
@@ -259,7 +261,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dateString =
         '${weekdayNames[today.weekday - 1]}, ${today.day} ${monthNames[today.month - 1]} ${today.year}';
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await _showExitConfirmationDialog(context);
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
       backgroundColor: kBgColor,
       body: SafeArea(
         child: _isLoading
@@ -1142,7 +1153,149 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
+    ),
+  );
+}
+
+  /// Shows confirmation popup when user presses phone back button to prevent accidental exit
+  Future<bool> _showExitConfirmationDialog(BuildContext context) async {
+    HapticFeedback.lightImpact();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF081220) : Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                width: 1.5,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Glowing Exit Shield Icon
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00E5FF), Color(0xFF3B66FF)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.exit_to_app_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                Text(
+                  LanguageService.tr('exit_dialog_title'),
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w800,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 10),
+
+                Text(
+                  LanguageService.tr('exit_dialog_msg'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                Row(
+                  children: [
+                    // Stay button
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(ctx).pop(false),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFCBD5E1),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Text(
+                          LanguageService.tr('exit_btn_stay'),
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Exit button
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.of(ctx).pop(true),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFEF4444),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          LanguageService.tr('exit_btn_exit'),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+
+    return result ?? false;
   }
 
   Widget _buildStatPill({
