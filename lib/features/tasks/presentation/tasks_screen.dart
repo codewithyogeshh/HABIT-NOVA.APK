@@ -2,8 +2,11 @@ import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/notification_service.dart';
+import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/task_service.dart';
+import 'package:synvero/features/tasks/presentation/family_nag_widget.dart';
 
 /// Tasks screen with real-time push notifications, loud alarms, and dynamic user scheduling.
 class TasksScreen extends StatefulWidget {
@@ -18,6 +21,8 @@ class _TasksScreenState extends State<TasksScreen> {
   int _currentTabIndex = 3; // Tasks tab
   List<TaskItem> _tasks = [];
   bool _isLoading = true;
+  String _username = 'Yogesh';
+  bool _isCompletedExpanded = true;
 
   @override
   void initState() {
@@ -28,6 +33,19 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Future<void> _loadTasks() async {
     setState(() => _isLoading = true);
+
+    try {
+      final user = SupabaseService.user;
+      if (user != null) {
+        final meta = user.userMetadata?['username'] as String?;
+        if (meta != null && meta.isNotEmpty) {
+          _username = meta;
+        } else if (user.email != null && user.email!.isNotEmpty) {
+          _username = user.email!.split('@').first;
+        }
+      }
+    } catch (_) {}
+
     final loaded = await TaskService.getTasks();
 
     if (loaded.isEmpty) {
@@ -381,6 +399,9 @@ class _TasksScreenState extends State<TasksScreen> {
       displayedTasks = _tasks;
     }
 
+    final pendingTasks = displayedTasks.where((t) => !t.isCompleted).toList();
+    final completedTasks = displayedTasks.where((t) => t.isCompleted).toList();
+
     final upcomingList = _tasks.where((t) {
       if (t.isCompleted) return false;
       if (t.isUpcoming) return true;
@@ -466,7 +487,33 @@ class _TasksScreenState extends State<TasksScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Task List
+                      // Loving Family Nag & Scold Card (speaks in user's native language)
+                      if (displayedTasks.isNotEmpty)
+                        FamilyNagWidget(
+                          pendingCount: pendingTasks.length,
+                          totalCount: displayedTasks.length,
+                          username: _username,
+                          onFocusWork: () {
+                            final lang = LanguageService.currentLanguageCode;
+                            final toastMsg = lang == LanguageService.marathi
+                                ? 'शाब्बास! असाच फोकस ठेव आणि एक-एक काम संपव! 🎯'
+                                : (lang == LanguageService.hindi
+                                    ? 'शाबाश! पूरा ध्यान लगाकर काम खत्म करो! 🎯'
+                                    : 'Let\'s go! Focus mode activated, knock them out! 🎯');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  toastMsg,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                                backgroundColor: const Color(0xFF10B981),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                        ),
+
+                      // Task Lists (Separated Active vs Completed)
                       if (displayedTasks.isEmpty)
                         Center(
                           child: Padding(
@@ -495,15 +542,117 @@ class _TasksScreenState extends State<TasksScreen> {
                             ),
                           ),
                         )
-                      else
-                        ...displayedTasks.map((task) => _buildTaskCard(
-                              task,
-                              isDark,
-                              kCardBg,
-                              kBorderColor,
-                              kTextColor,
-                              kSubtextColor,
-                            )),
+                      else ...[
+                        // 1. Incomplete / Active Tasks Section
+                        if (pendingTasks.isNotEmpty) ...[
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF59E0B),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${LanguageService.tr('pending_tasks')} (${pendingTasks.length})',
+                                style: TextStyle(
+                                  color: kTextColor,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ...pendingTasks.map((task) => _buildTaskCard(
+                                task,
+                                isDark,
+                                kCardBg,
+                                kBorderColor,
+                                kTextColor,
+                                kSubtextColor,
+                              )),
+                        ],
+
+                        // 2. Completed Tasks Section (Separate List)
+                        if (completedTasks.isNotEmpty) ...[
+                          const SizedBox(height: 14),
+                          InkWell(
+                            onTap: () {
+                              setState(() {
+                                _isCompletedExpanded = !_isCompletedExpanded;
+                              });
+                            },
+                            borderRadius: BorderRadius.circular(10),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 8,
+                                    height: 8,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${LanguageService.tr('completed_tasks')} (${completedTasks.length})',
+                                    style: TextStyle(
+                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${completedTasks.length}',
+                                          style: const TextStyle(
+                                            color: Color(0xFF10B981),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Icon(
+                                          _isCompletedExpanded
+                                              ? Icons.keyboard_arrow_up_rounded
+                                              : Icons.keyboard_arrow_down_rounded,
+                                          color: const Color(0xFF10B981),
+                                          size: 16,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (_isCompletedExpanded)
+                            ...completedTasks.map((task) => _buildTaskCard(
+                                  task,
+                                  isDark,
+                                  kCardBg,
+                                  kBorderColor,
+                                  kTextColor,
+                                  kSubtextColor,
+                                )),
+                        ],
+                      ],
 
                       const SizedBox(height: 24),
 

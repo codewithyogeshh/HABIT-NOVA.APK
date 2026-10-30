@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/services/avatar_service.dart';
+import 'package:synvero/core/services/habit_daily_service.dart';
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
@@ -35,7 +37,7 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> {
+class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   final _authRepository = AuthRepository();
   String? _username;
   bool _isLoading = true;
@@ -47,6 +49,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _streakDays = 0;
   int _totalXP = 150;
   final Map<String, bool> _habitCompletionMap = {};
+  Timer? _midnightCheckTimer;
+  String? _lastCheckedDate;
 
   // Standard starter habits definition
   final List<Map<String, dynamic>> _todayHabitItems = [
@@ -95,7 +99,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lastCheckedDate = HabitDailyService.getTodayDateStr();
     _loadProfile();
+
+    // Check every minute for automatic 12:00 AM midnight reset
+    _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      final today = HabitDailyService.getTodayDateStr();
+      if (_lastCheckedDate != null && _lastCheckedDate != today) {
+        _lastCheckedDate = today;
+        _loadProfile();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _midnightCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final today = HabitDailyService.getTodayDateStr();
+      if (_lastCheckedDate != null && _lastCheckedDate != today) {
+        _lastCheckedDate = today;
+        _loadProfile();
+      }
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -108,15 +141,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       final currentUserId = user?.id ?? 'guest';
       await AvatarService.loadForUser(currentUserId);
 
+      // Check and execute midnight habit reset if date changed
+      await HabitDailyService.verifyAndPerformMidnightReset(currentUserId);
+
       final prefs = await SharedPreferences.getInstance();
 
-      // 1. Calculate real completed habits count (strictly 0 for new user, no dummy completions)
+      // 1. Calculate real completed habits count with date-aware midnight reset
       int completed = 0;
       final defaultHabitIds = ['def-1', 'def-2', 'def-3', 'def-4', 'def-5'];
       _habitCompletionMap.clear();
       for (final id in defaultHabitIds) {
-        final key = 'user_${currentUserId}_habit_${id}_completed';
-        final isDone = prefs.getBool(key) ?? false;
+        final isDone = await HabitDailyService.isHabitCompletedToday(currentUserId, id);
         _habitCompletionMap[id] = isDone;
         if (isDone) completed++;
       }
@@ -194,8 +229,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     try {
+      await HabitDailyService.setHabitCompletedToday(currentUserId, habitId, newStatus);
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('user_${currentUserId}_habit_${habitId}_completed', newStatus);
       await prefs.setInt('user_${currentUserId}_streak_days', _streakDays);
       AppWidgetService.syncWidget();
     } catch (_) {}

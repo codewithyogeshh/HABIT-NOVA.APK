@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
+import 'package:synvero/core/services/habit_daily_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/task_service.dart';
 import 'package:synvero/features/habits/data/habit_repository.dart';
@@ -19,7 +20,7 @@ class HabitScreen extends StatefulWidget {
   State<HabitScreen> createState() => _HabitScreenState();
 }
 
-class _HabitScreenState extends State<HabitScreen> {
+class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   final _repository = HabitRepository();
   List<Habit> _habits = [];
   Map<String, bool> _todayCompletion = {};
@@ -27,6 +28,8 @@ class _HabitScreenState extends State<HabitScreen> {
   bool _isLoading = true;
   int _selectedFilterIndex = 0; // 0: Today, 1: Weekly, 2: Monthly
   int _currentTabIndex = 1; // Habits tab
+  Timer? _midnightCheckTimer;
+  String? _lastCheckedDate;
 
   // Built-in starter habits matching mockup when DB is fresh
   final List<Map<String, dynamic>> _defaultHabits = [
@@ -89,7 +92,36 @@ class _HabitScreenState extends State<HabitScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _lastCheckedDate = HabitDailyService.getTodayDateStr();
     _loadData();
+
+    // Automatic midnight (12:00 AM) reset check
+    _midnightCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      final today = HabitDailyService.getTodayDateStr();
+      if (_lastCheckedDate != null && _lastCheckedDate != today) {
+        _lastCheckedDate = today;
+        _loadData();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _midnightCheckTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final today = HabitDailyService.getTodayDateStr();
+      if (_lastCheckedDate != null && _lastCheckedDate != today) {
+        _lastCheckedDate = today;
+        _loadData();
+      }
+    }
   }
 
   String get _currentUserId => SupabaseService.user?.id ?? 'guest';
@@ -100,12 +132,14 @@ class _HabitScreenState extends State<HabitScreen> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
+      // Automatic daily reset at midnight
+      await HabitDailyService.verifyAndPerformMidnightReset(_currentUserId);
+
       for (final habit in _defaultHabits) {
-        final key = 'user_${_currentUserId}_habit_${habit['id']}_completed';
-        final isDone = prefs.getBool(key) ?? false;
+        final hid = habit['id'] as String;
+        final isDone = await HabitDailyService.isHabitCompletedToday(_currentUserId, hid);
         habit['completed'] = isDone;
-        habit['subtitle'] = _getHabitSubtitle(habit['id'] as String, isDone);
+        habit['subtitle'] = _getHabitSubtitle(hid, isDone);
       }
 
       final habits = await _repository.getHabits(includeArchived: false);
@@ -152,7 +186,7 @@ class _HabitScreenState extends State<HabitScreen> {
         }
       } catch (_) {}
     } else {
-      // Toggle for default fallback habits
+      // Toggle for default fallback habits with date-aware midnight reset support
       final habit = _defaultHabits.firstWhere((h) => h['id'] == habitId);
       final newStatus = !(habit['completed'] as bool);
       becameCompleted = newStatus;
@@ -161,10 +195,7 @@ class _HabitScreenState extends State<HabitScreen> {
         habit['completed'] = newStatus;
         habit['subtitle'] = _getHabitSubtitle(habitId, newStatus);
       });
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('user_${_currentUserId}_habit_${habitId}_completed', newStatus);
-      } catch (_) {}
+      await HabitDailyService.setHabitCompletedToday(_currentUserId, habitId, newStatus);
     }
 
     if (becameCompleted) {
