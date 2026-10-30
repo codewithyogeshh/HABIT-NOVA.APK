@@ -21,6 +21,7 @@ import 'package:synvero/core/services/theme_service.dart';
 import 'package:synvero/features/fitness/presentation/fitness_screen.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/widgets/alarm_ringing_dialog.dart';
+import 'package:synvero/core/widgets/animated_splash_screen.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 
 void main() async {
@@ -156,6 +157,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
   }
 
   Future<void> _checkInitialAuth() async {
+    final splashStart = DateTime.now();
     try {
       final loggedIn = await _authRepository.isLoggedIn();
       if (loggedIn) {
@@ -166,6 +168,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
       } else {
         AvatarService.resetForLogout();
       }
+
+      // Guarantee at least 1.8 seconds of smooth splash animation
+      final elapsed = DateTime.now().difference(splashStart);
+      final remaining = const Duration(milliseconds: 1800) - elapsed;
+      if (remaining > Duration.zero) {
+        await Future.delayed(remaining);
+      }
+
       if (mounted) {
         setState(() {
           _isAuthenticated = loggedIn;
@@ -173,6 +183,11 @@ class _AuthWrapperState extends State<AuthWrapper> {
         });
       }
     } catch (_) {
+      final elapsed = DateTime.now().difference(splashStart);
+      final remaining = const Duration(milliseconds: 1800) - elapsed;
+      if (remaining > Duration.zero) {
+        await Future.delayed(remaining);
+      }
       if (mounted) {
         setState(() {
           _isAuthenticated = false;
@@ -222,17 +237,14 @@ class _AuthWrapperState extends State<AuthWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFFF8FAFC),
-        body: Center(
-          child: CircularProgressIndicator(color: Color(0xFF3B66FF)),
-        ),
-      );
-    }
-
-    return Navigator(
-      key: appNavigatorKey,
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      child: _isLoading
+          ? const AnimatedSplashScreen(key: ValueKey('splash_screen'))
+          : Navigator(
+              key: appNavigatorKey,
       initialRoute: _isAuthenticated ? '/dashboard' : '/login',
       onGenerateRoute: (settings) {
         switch (settings.name) {
@@ -276,6 +288,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             );
         }
       },
-    );
-  }
+    ),
+  );
+}
 }
