@@ -1,4 +1,4 @@
-# synvero
+# HabitNova 
 
 A new Flutter project.
 
