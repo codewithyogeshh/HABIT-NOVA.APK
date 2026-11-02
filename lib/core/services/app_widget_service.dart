@@ -10,6 +10,19 @@ import 'package:synvero/features/habits/data/habit_repository.dart';
 class AppWidgetService {
   static const MethodChannel _channel = MethodChannel('com.example.synvero/widget');
 
+  /// Prompts Android system to pin the Habit-Nova widget directly to the user's home screen
+  static Future<bool> pinWidgetToHomeScreen() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      await syncWidget();
+      final bool? success = await _channel.invokeMethod<bool>('pinWidget');
+      return success ?? false;
+    } catch (e) {
+      debugPrint('AppWidgetService.pinWidgetToHomeScreen error: $e');
+      return false;
+    }
+  }
+
   /// Reads current user tasks and habits, calculates live completion progress,
   /// and updates all instances of the HabbitNova Android Home Screen Widget.
   static Future<void> syncWidget() async {

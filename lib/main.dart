@@ -27,6 +27,8 @@ import 'package:synvero/core/widgets/animated_splash_screen.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 import 'package:synvero/features/statistics/presentation/statistics_screen.dart';
 import 'package:synvero/features/leaderboard/presentation/leaderboard_screen.dart';
+import 'package:synvero/features/squads/presentation/squads_screen.dart';
+
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/app_limit_service.dart';
 
@@ -325,6 +327,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return MaterialPageRoute(builder: (context) => const StatisticsScreen());
           case '/leaderboard':
             return MaterialPageRoute(builder: (context) => const LeaderboardScreen());
+          case '/squads':
+            return MaterialPageRoute(builder: (context) => const SquadsScreen());
           default:
             // If already authenticated, show dashboard
             if (_isAuthenticated) {

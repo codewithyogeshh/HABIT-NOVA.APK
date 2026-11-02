@@ -17,6 +17,10 @@ import 'package:synvero/features/dashboard/presentation/ai_coach_card.dart';
 import 'package:synvero/features/dashboard/presentation/weekly_heatmap_widget.dart';
 import 'package:synvero/features/dashboard/presentation/share_story_card_dialog.dart';
 import 'package:synvero/features/profile/presentation/badges_showcase_sheet.dart';
+import 'package:synvero/features/share/presentation/story_card_dialog.dart';
+import 'package:synvero/features/ai_coach/presentation/ai_coach_sheet.dart';
+import 'package:synvero/features/widgets/presentation/widget_showcase_sheet.dart';
+
 
 /// Home Dashboard screen.
 ///
@@ -37,6 +41,49 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+  void _showStoryCardDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => StoryCardDialog(
+        username: _username ?? 'Yogesh',
+        avatar: '👑',
+        streakDays: _streakDays > 0 ? _streakDays : 1,
+        studyMinutes: _studyMinutes > 0 ? _studyMinutes : 45,
+        habitsDone: _completedHabitsCount,
+        habitsTotal: _todayHabitItems.length,
+        screenTimeSavedPercent: 42,
+      ),
+    );
+  }
+
+  void _showAiCoachSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => AiCoachSheet(
+        streakDays: _streakDays,
+        studyMinutes: _studyMinutes,
+        screenTimeMinutes: 85,
+        habitsDone: _completedHabitsCount,
+        habitsTotal: _todayHabitItems.length,
+      ),
+    );
+  }
+
+  void _showWidgetShowcaseSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => WidgetShowcaseSheet(
+        streakDays: _streakDays > 0 ? _streakDays : 1,
+        habitsDone: _completedHabitsCount,
+        habitsTotal: _todayHabitItems.length,
+      ),
+    );
+  }
+
   String? _username;
   bool _isLoading = true;
   int _currentTabIndex = 0;
@@ -859,11 +906,236 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                 Navigator.of(context).pushNamed('/leaderboard');
                               },
                             ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.groups_rounded,
+                              label: 'Squads ⚔️',
+                              color: const Color(0xFFEC4899),
+                              bgColor: const Color(0xFFFCE7F3),
+                              isDark: isDark,
+                              onTap: () {
+                                Navigator.of(context).pushNamed('/squads');
+                              },
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.photo_camera_back_rounded,
+                              label: 'Story Card 📸',
+                              color: const Color(0xFFF59E0B),
+                              bgColor: const Color(0xFFFEF3C7),
+                              isDark: isDark,
+                              onTap: _showStoryCardDialog,
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.psychology_alt_rounded,
+                              label: 'AI Coach 🤖',
+                              color: const Color(0xFFF97316),
+                              bgColor: const Color(0xFFFFEDD5),
+                              isDark: isDark,
+                              onTap: _showAiCoachSheet,
+                            ),
+                            const SizedBox(width: 14),
+                            _buildQuickActionButton(
+                              icon: Icons.widgets_rounded,
+                              label: 'Widget 📱',
+                              color: const Color(0xFF06B6D4),
+                              bgColor: const Color(0xFFCFFAFE),
+                              isDark: isDark,
+                              onTap: _showWidgetShowcaseSheet,
+                            ),
                           ],
                         ),
                       ),
 
                       const SizedBox(height: 24),
+
+                      
+                      const SizedBox(height: 20),
+
+                      // Viral Growth & Utility Highlights Banner
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            // Card 1: Habit Squads
+                            InkWell(
+                              onTap: () => Navigator.of(context).pushNamed('/squads'),
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                width: 260,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF831843), Color(0xFF500724)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFFF472B6).withOpacity(0.4)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF831843).withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white24,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            '⚔️ HABIT BATTLE',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'मित्रांसोबत चॅलेंज खेळा!',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'WhatsApp वर इनव्हाईट करा आणि कोणाचा Streak टिकतो ते बघा 🔥',
+                                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Card 2: Aesthetic Story Poster
+                            InkWell(
+                              onTap: _showStoryCardDialog,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                width: 260,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0F766E), Color(0xFF134E4A)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0F766E).withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white24,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            '📸 1-CLICK SHARE',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Aesthetic Story Poster',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'Streak आणि Focus चे सुंदर कार्ड WhatsApp / Insta वर शेअर करा 🚀',
+                                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Card 3: Home Screen Widget
+                            InkWell(
+                              onTap: _showWidgetShowcaseSheet,
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                width: 260,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF0369A1), Color(0xFF0C4A6E)],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFF0369A1).withOpacity(0.3),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white24,
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Text(
+                                            '📱 HOME WIDGET',
+                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                          ),
+                                        ),
+                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    const Text(
+                                      'Home Screen Widget',
+                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      'ॲप न उघडता थेट फोनच्या स्क्रीनवर सवयी पूर्ण करा ⚡',
+                                      style: TextStyle(fontSize: 11, color: Colors.white70),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
                       // Today's Habits Section Header
                       Row(

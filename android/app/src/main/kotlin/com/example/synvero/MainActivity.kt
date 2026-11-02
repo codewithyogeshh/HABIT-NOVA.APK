@@ -15,6 +15,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugins.GeneratedPluginRegistrant
+import androidx.core.content.FileProvider
 
 class MainActivity : FlutterActivity() {
     private val WIDGET_CHANNEL = "com.example.synvero/widget"
@@ -103,8 +104,20 @@ class MainActivity : FlutterActivity() {
                 for (id in appWidgetIds) {
                     SynveroAppWidget.updateAppWidget(this, appWidgetManager, id)
                 }
-
                 result.success(true)
+            } else if (call.method == "pinWidget") {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val appWidgetManager = getSystemService(AppWidgetManager::class.java)
+                    val myProvider = ComponentName(this, SynveroAppWidget::class.java)
+                    if (appWidgetManager != null && appWidgetManager.isRequestPinAppWidgetSupported) {
+                        appWidgetManager.requestPinAppWidget(myProvider, null, null)
+                        result.success(true)
+                    } else {
+                        result.success(false)
+                    }
+                } else {
+                    result.success(false)
+                }
             } else {
                 result.notImplemented()
             }
@@ -152,6 +165,25 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("SHARE_ERROR", e.localizedMessage, null)
+                }
+            } else if (call.method == "shareImage") {
+                val imagePath = call.argument<String>("imagePath")
+                val text = call.argument<String>("text") ?: ""
+                val title = call.argument<String>("title") ?: "Share Progress"
+                try {
+                    val file = java.io.File(imagePath ?: "")
+                    val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+                    val sendIntent = Intent().apply {
+                        action = Intent.ACTION_SEND
+                        putExtra(Intent.EXTRA_STREAM, uri)
+                        putExtra(Intent.EXTRA_TEXT, text)
+                        type = "image/png"
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    startActivity(Intent.createChooser(sendIntent, title))
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("SHARE_IMAGE_ERROR", e.localizedMessage, null)
                 }
             } else {
                 result.notImplemented()
