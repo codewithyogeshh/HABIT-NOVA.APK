@@ -42,7 +42,6 @@ dependencies:
 
   # SharedPreferences for PKCE flow async storage
   shared_preferences: ^2.3.5
-  shared_preferences_android: ^2.4.28
 
   # HTTP client for live AI API calls (Google Gemini)
   http: ^1.2.0

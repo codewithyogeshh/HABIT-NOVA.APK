@@ -4,9 +4,7 @@ import 'package:synvero/core/navigation/app_navigator.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shared_preferences_android/shared_preferences_android.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:synvero/app/theme/app_theme.dart';
 import 'package:synvero/core/config/supabase_config.dart';
@@ -30,6 +28,7 @@ import 'package:synvero/core/services/avatar_service.dart';
 import 'package:synvero/features/statistics/presentation/statistics_screen.dart';
 import 'package:synvero/features/leaderboard/presentation/leaderboard_screen.dart';
 import 'package:synvero/core/services/language_service.dart';
+import 'package:synvero/core/services/app_limit_service.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
@@ -39,15 +38,6 @@ void main() async {
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
   ]);
-
-  // Explicitly register Android SharedPreferences store
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    try {
-      SharedPreferencesAndroid.registerWith();
-    } catch (e) {
-      debugPrint('SharedPreferencesAndroid.registerWith: $e');
-    }
-  }
 
   // Defensively initialize services so startup never results in a black screen
   try {
@@ -109,10 +99,23 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
     NotificationService.requestPermissions();
     // Check if an alarm is already ringing in background
     NotificationService.checkForActiveAlarms();
+    // Wire up app blocker event listener
+    AppLimitService.ensureHandler();
+    AppLimitService.blockedAppEventNotifier.addListener(_handleBlockedAppEvent);
+  }
+
+  void _handleBlockedAppEvent() {
+    final ev = AppLimitService.blockedAppEventNotifier.value;
+    if (ev != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        appNavigatorKey.currentState?.pushNamed('/statistics');
+      });
+    }
   }
 
   @override
   void dispose() {
+    AppLimitService.blockedAppEventNotifier.removeListener(_handleBlockedAppEvent);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

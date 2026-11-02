@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">HabbitNova Focus Shield locks apps when their daily usage limit is reached to help you maintain digital discipline.</string>
+</resources>
+

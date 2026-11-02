@@ -21,7 +21,9 @@ class MainActivity : FlutterActivity() {
     private val ALARM_CHANNEL = "com.example.synvero/alarm"
     private val FOCUS_SOUND_CHANNEL = "com.example.synvero/focus_sounds"
     private val SHARE_CHANNEL = "com.example.synvero/share"
+    private val USAGE_STATS_CHANNEL = "com.example.synvero/usage_stats"
 
+    private var usageStatsChannel: MethodChannel? = null
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
 
@@ -31,6 +33,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        UsageStatsHelper.cleanupCorruptedPrefs(this)
         try {
             GeneratedPluginRegistrant.registerWith(flutterEngine)
         } catch (e: Exception) {
@@ -153,6 +156,81 @@ class MainActivity : FlutterActivity() {
             } else {
                 result.notImplemented()
             }
+        }
+
+        // 5. Screen Time & Digital Wellbeing App Limits Channel
+        val usageChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, USAGE_STATS_CHANNEL)
+        usageStatsChannel = usageChannel
+        usageChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "hasUsagePermission" -> {
+                    result.success(UsageStatsHelper.hasUsagePermission(this))
+                }
+                "requestUsagePermission" -> {
+                    UsageStatsHelper.openUsageSettings(this)
+                    result.success(true)
+                }
+                "hasAccessibilityPermission" -> {
+                    result.success(UsageStatsHelper.isAccessibilityEnabled(this))
+                }
+                "requestAccessibilityPermission" -> {
+                    UsageStatsHelper.openAccessibilitySettings(this)
+                    result.success(true)
+                }
+                "getScreenTimeStats" -> {
+                    val stats = UsageStatsHelper.getScreenTimeStats(this)
+                    result.success(stats)
+                }
+                "getDataUsageStats" -> {
+                    val stats = UsageStatsHelper.getDataUsageStats(this)
+                    result.success(stats)
+                }
+                "setAppLimit" -> {
+                    val pkg = call.argument<String>("packageName") ?: ""
+                    val name = call.argument<String>("appName") ?: ""
+                    val minutes = call.argument<Int>("minutes") ?: 60
+                    UsageStatsHelper.setAppLimit(this, pkg, name, minutes)
+                    result.success(true)
+                }
+                "removeAppLimit" -> {
+                    val pkg = call.argument<String>("packageName") ?: ""
+                    val name = call.argument<String>("appName") ?: ""
+                    UsageStatsHelper.removeAppLimit(this, pkg, name)
+                    result.success(true)
+                }
+                "getAllLimits" -> {
+                    result.success(UsageStatsHelper.getAllLimits(this))
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        handleBlockedAppIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleBlockedAppIntent(intent)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        handleBlockedAppIntent(intent)
+    }
+
+    private fun handleBlockedAppIntent(intent: Intent?) {
+        if (intent != null && intent.hasExtra("blocked_package")) {
+            val pkg = intent.getStringExtra("blocked_package") ?: ""
+            val name = intent.getStringExtra("blocked_app_name") ?: pkg
+            val limit = intent.getIntExtra("blocked_limit_mins", 0)
+            val used = intent.getIntExtra("blocked_used_mins", 0)
+            usageStatsChannel?.invokeMethod("onAppBlockedEvent", mapOf(
+                "packageName" to pkg,
+                "appName" to name,
+                "limitMinutes" to limit,
+                "usedMinutes" to used
+            ))
+            intent.removeExtra("blocked_package")
         }
     }
 
