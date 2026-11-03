@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/share_card_service.dart';
 
 enum StoryCardTheme {
@@ -40,7 +41,6 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
 
   @override
   Widget build(BuildContext context) {
-
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
@@ -51,9 +51,9 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                '📸 Status / Story Poster',
-                style: TextStyle(
+              Text(
+                LanguageService.tr('story_card_title'),
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -71,11 +71,11 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildThemeChip(StoryCardTheme.midnightCyber, '🌌 Cyber Cyan'),
+              _buildThemeChip(StoryCardTheme.midnightCyber, LanguageService.tr('theme_cyber')),
               const SizedBox(width: 8),
-              _buildThemeChip(StoryCardTheme.goldChampion, '👑 Champion Gold'),
+              _buildThemeChip(StoryCardTheme.goldChampion, LanguageService.tr('theme_gold')),
               const SizedBox(width: 8),
-              _buildThemeChip(StoryCardTheme.emeraldForest, '🌿 Emerald Zen'),
+              _buildThemeChip(StoryCardTheme.emeraldForest, LanguageService.tr('theme_zen')),
             ],
           ),
           const SizedBox(height: 12),
@@ -116,7 +116,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
                 flex: 2,
                 child: ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF25D366), // WhatsApp Green
+                    backgroundColor: const Color(0xFF25D366),
                     foregroundColor: Colors.white,
                     elevation: 4,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -130,7 +130,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
                         )
                       : const Icon(Icons.share_rounded, size: 20),
                   label: Text(
-                    _isSharing ? 'Generating...' : '🚀 Share to WhatsApp / Insta',
+                    _isSharing ? '...' : LanguageService.tr('share_story'),
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   onPressed: _isSharing ? null : _handleShare,
@@ -151,7 +151,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? kPrimaryColor : Colors.black.withOpacity(0.4),
+          color: isSelected ? kPrimaryColor : Colors.black.withValues(alpha: 0.4),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? Colors.white : Colors.white24,
@@ -203,10 +203,10 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: accentColor.withOpacity(0.5), width: 1.5),
+        border: Border.all(color: accentColor.withValues(alpha: 0.5), width: 1.5),
         boxShadow: [
           BoxShadow(
-            color: accentColor.withOpacity(0.2),
+            color: accentColor.withValues(alpha: 0.2),
             blurRadius: 24,
             spreadRadius: 2,
           ),
@@ -223,7 +223,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.2),
+                  color: accentColor.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(Icons.spa_rounded, color: accentColor, size: 16),
@@ -271,11 +271,11 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.15),
+              color: accentColor.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
-              '⚡ Focus Warrior • Level ${(widget.streakDays / 3).floor() + 1}',
+              '⚡ Focus Champion • Level ${(widget.streakDays / 3).floor() + 1}',
               style: TextStyle(
                 color: accentColor,
                 fontSize: 11,
@@ -290,16 +290,16 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
             decoration: BoxDecoration(
-              color: statBg.withOpacity(0.7),
+              color: statBg.withValues(alpha: 0.7),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: accentColor.withOpacity(0.3)),
+              border: Border.all(color: accentColor.withValues(alpha: 0.3)),
             ),
             child: Column(
               children: [
                 const Text(
                   '🔥 UNBROKEN STREAK',
                   style: TextStyle(
-                    color: Color(0xFFF97316), // Orange flame
+                    color: Color(0xFFF97316),
                     fontSize: 12,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.5,
@@ -307,10 +307,10 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${widget.streakDays} DAYS',
+                  '${widget.streakDays} ${LanguageService.tr('streak_label').toUpperCase()}',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 30,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 1.2,
                   ),
@@ -335,7 +335,7 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
               Expanded(
                 child: _buildMiniStatChip(
                   icon: Icons.timer_rounded,
-                  label: 'Focus Study',
+                  label: LanguageService.tr('study_label'),
                   value: '${widget.studyMinutes}m',
                   color: const Color(0xFF10B981),
                   bgColor: statBg,
@@ -345,71 +345,44 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
               Expanded(
                 child: _buildMiniStatChip(
                   icon: Icons.check_circle_rounded,
-                  label: 'Habits Done',
+                  label: LanguageService.tr('habits_label'),
                   value: '${widget.habitsDone}/${widget.habitsTotal}',
                   color: accentColor,
                   bgColor: statBg,
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMiniStatChip(
+                  icon: Icons.trending_down_rounded,
+                  label: 'Screen',
+                  value: '-${widget.screenTimeSavedPercent}%',
+                  color: const Color(0xFF38BDF8),
+                  bgColor: statBg,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            decoration: BoxDecoration(
-              color: statBg,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.shield_rounded, color: Color(0xFF38BDF8), size: 16),
-                const SizedBox(width: 6),
-                Text(
-                  '🛡️ Screen Time Cut by ${widget.screenTimeSavedPercent}% Today',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
 
-          // 5. Aesthetic Quote
-          const Text(
-            '"Discipline today builds the freedom of tomorrow."',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 11,
-              fontStyle: FontStyle.italic,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 6. Bottom Watermark & CTA for Play Store
+          // 5. Aesthetic Footer Branding / QR
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white12),
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.android_rounded, color: Color(0xFF10B981), size: 16),
+                const Icon(Icons.install_mobile_rounded, color: Colors.white70, size: 14),
                 const SizedBox(width: 6),
                 Text(
-                  'Join my streak on Habit-Nova',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                  LanguageService.tr('download_tag'),
+                  style: const TextStyle(
+                    color: Colors.white70,
                     fontSize: 10,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -430,24 +403,28 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
       decoration: BoxDecoration(
-        color: bgColor,
+        color: bgColor.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 18),
+          Icon(icon, size: 16, color: color),
           const SizedBox(height: 4),
           Text(
             value,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 15,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             label,
-            style: const TextStyle(color: Colors.white54, fontSize: 10),
+            style: const TextStyle(
+              color: Colors.white54,
+              fontSize: 9,
+            ),
           ),
         ],
       ),
@@ -455,22 +432,31 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
   }
 
   void _copyCaption() {
-    final caption = '''🔥 *Day ${widget.streakDays} of Habit & Focus Mastery on Habit-Nova!* 🔥
-
-⏱️ Focus Study Today: ${widget.studyMinutes} Mins
-🎯 Habits Crushed: ${widget.habitsDone}/${widget.habitsTotal}
-🛡️ Screen Time Reduced by ${widget.screenTimeSavedPercent}%!
-
-कष्ट आज, यश उद्या! 💪
-माझ्यासोबत हॅबिट्स आणि फोकस ट्रॅक करण्यासाठी Habit-Nova डाउनलोड करा:
-📲 https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+    final lang = LanguageService.currentLanguageCode;
+    String caption;
+    if (lang == LanguageService.marathi) {
+      caption = '''🔥 Habit-Nova वर माझा ${widget.streakDays} दिवसांचा स्ट्रिक!
+⏱️ फोकस अभ्यास: ${widget.studyMinutes} मिनिटे | 🎯 सवयी: ${widget.habitsDone}/${widget.habitsTotal}
+माझ्यासोबत हॅबिट बॅटलमध्ये सहभागी व्हा:
+https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+    } else if (lang == LanguageService.hindi) {
+      caption = '''🔥 Habit-Nova पर मेरी ${widget.streakDays} दिनों की स्ट्रीक!
+⏱️ फोकस अध्ययन: ${widget.studyMinutes} मिनट | 🎯 आदतें: ${widget.habitsDone}/${widget.habitsTotal}
+मेरे साथ हैबिट बैटल में शामिल हों:
+https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+    } else {
+      caption = '''🔥 Day ${widget.streakDays} Streak on Habit-Nova!
+⏱️ Focus: ${widget.studyMinutes}m | 🎯 Habits: ${widget.habitsDone}/${widget.habitsTotal}
+Download Habit-Nova & join my squad:
+https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+    }
 
     Clipboard.setData(ClipboardData(text: caption));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('📋 Caption copied to clipboard! Paste it on WhatsApp/Insta!'),
-        backgroundColor: Color(0xFF10B981),
-        duration: Duration(seconds: 2),
+      SnackBar(
+        content: Text(LanguageService.tr('card_copied')),
+        backgroundColor: const Color(0xFF10B981),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -483,10 +469,21 @@ class _StoryCardDialogState extends State<StoryCardDialog> {
         throw Exception('Failed to render poster image.');
       }
 
-      final caption = '''🔥 Day ${widget.streakDays} Streak on Habit-Nova!
-⏱️ Focus: ${widget.studyMinutes}m | 🎯 Habits: ${widget.habitsDone}/${widget.habitsTotal}
-Download Habit-Nova to conquer your goals:
+      final lang = LanguageService.currentLanguageCode;
+      String caption;
+      if (lang == LanguageService.marathi) {
+        caption = '''🔥 Habit-Nova वर माझा ${widget.streakDays} दिवसांचा स्ट्रिक!
+⏱️ अभ्यास: ${widget.studyMinutes} मिनिटे | 🎯 सवयी: ${widget.habitsDone}/${widget.habitsTotal}
 https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+      } else if (lang == LanguageService.hindi) {
+        caption = '''🔥 Habit-Nova पर मेरी ${widget.streakDays} दिनों की स्ट्रीक!
+⏱️ अध्ययन: ${widget.studyMinutes} मिनट | 🎯 आदतें: ${widget.habitsDone}/${widget.habitsTotal}
+https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+      } else {
+        caption = '''🔥 Day ${widget.streakDays} Streak on Habit-Nova!
+⏱️ Focus: ${widget.studyMinutes}m | 🎯 Habits: ${widget.habitsDone}/${widget.habitsTotal}
+https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
+      }
 
       await ShareCardService.shareStoryImage(
         pngBytes: pngBytes,
@@ -505,4 +502,3 @@ https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
     }
   }
 }
-

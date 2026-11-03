@@ -163,6 +163,9 @@ class LeaderboardService {
                 // Skip legacy dummy names or empty entries
                 if (uname.isEmpty ||
                     id.startsWith('dummy_') ||
+                    id.startsWith('squad_') ||
+                    id.startsWith('sqm_') ||
+                    id.startsWith('test_') ||
                     uname.contains('Aarav') ||
                     uname.contains('Priya Patel')) {
                   continue;

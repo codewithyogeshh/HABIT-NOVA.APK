@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/ai_coach_service.dart';
+import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/share_card_service.dart';
 
 class AiCoachSheet extends StatefulWidget {
@@ -90,7 +91,7 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                     width: 44,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.3),
+                      color: Colors.grey.withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -106,7 +107,7 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                         const Text('🤖', style: TextStyle(fontSize: 24)),
                         const SizedBox(width: 8),
                         Text(
-                          'AI Habit & Focus Coach',
+                          LanguageService.tr('ai_coach_title'),
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
@@ -128,11 +129,11 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _buildPersonalityChip(CoachPersonality.savageRoast, '🔥 Savage Roast (टोमणे)'),
+                      _buildPersonalityChip(CoachPersonality.savageRoast, LanguageService.tr('coach_savage')),
                       const SizedBox(width: 8),
-                      _buildPersonalityChip(CoachPersonality.toughLove, '🥊 Tough Love (कडक शिस्त)'),
+                      _buildPersonalityChip(CoachPersonality.toughLove, LanguageService.tr('coach_tough')),
                       const SizedBox(width: 8),
-                      _buildPersonalityChip(CoachPersonality.zenMaster, '🧘 Zen Master (शांत)'),
+                      _buildPersonalityChip(CoachPersonality.zenMaster, LanguageService.tr('coach_zen')),
                     ],
                   ),
                 ),
@@ -152,12 +153,12 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                     ),
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: const Color(0xFFF97316).withOpacity(0.4),
+                      color: const Color(0xFFF97316).withValues(alpha: 0.4),
                       width: 1.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFFF97316).withOpacity(0.1),
+                        color: const Color(0xFFF97316).withValues(alpha: 0.1),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),
@@ -172,8 +173,8 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                           const SizedBox(width: 6),
                           Text(
                             _personality == CoachPersonality.savageRoast
-                                ? 'SAVAGE CALLOUT OF THE DAY'
-                                : 'COACH ADVICE',
+                                ? '🔥 SAVAGE CALLOUT'
+                                : '⚡ COACH ADVICE',
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w900,
@@ -209,7 +210,7 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                         icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('New Roast'),
+                        label: Text(LanguageService.tr('generate_fresh_roast')),
                         onPressed: _generateNewRoast,
                       ),
                     ),
@@ -217,20 +218,28 @@ class _AiCoachSheetState extends State<AiCoachSheet> {
                     Expanded(
                       child: ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF25D366), // WhatsApp Green
+                          backgroundColor: const Color(0xFF25D366),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                         icon: const Icon(Icons.share_rounded, size: 18),
-                        label: const Text('Post Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                        label: Text(
+                          LanguageService.tr('share_roast_whatsapp'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                         onPressed: () {
-                          final text = '''$_currentRoast
-
-🚀 Habit-Nova वरील माझा AI कोच मला थेट टोमणे मारून अभ्यासाला लावतोय! 😂
-तुम्हीही तुमचे हॅबिट्स ट्रॅक करा:
-https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
-                          ShareCardService.shareText(text, title: 'Share AI Roast');
+                          final lang = LanguageService.currentLanguageCode;
+                          String promoTag;
+                          if (lang == LanguageService.marathi) {
+                            promoTag = '🚀 Habit-Nova वरील माझा AI कोच मला थेट टोमणे मारून अभ्यासाला लावतोय! 😂\nतुम्हीही तुमचे हॅबिट्स ट्रॅक करा:';
+                          } else if (lang == LanguageService.hindi) {
+                            promoTag = '🚀 Habit-Nova पर मेरा AI कोच मुझे मजेदार व्यंग्य सुनाकर पढ़ाई करवा रहा है! 😂\nआप भी अपनी आदतें ट्रैक करें:';
+                          } else {
+                            promoTag = '🚀 My AI Coach on Habit-Nova keeps me accountable with savage roasts! 😂\nTrack your habits & boost your streak:';
+                          }
+                          final text = '$_currentRoast\n\n$promoTag\nhttps://github.com/codewithyogeshh/HABIT-NOVA.APK';
+                          ShareCardService.shareText(text, title: LanguageService.tr('share_roast_whatsapp'));
                         },
                       ),
                     ),
@@ -242,7 +251,7 @@ https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(
-                    'रोज मजेदार नोटिफिकेशन्स पाठवा',
+                    LanguageService.tr('daily_notifications_title'),
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
@@ -250,14 +259,14 @@ https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
                     ),
                   ),
                   subtitle: Text(
-                    'दुपारी आणि रात्री आळस मोडण्यासाठी AI नोटिफिकेशन्स',
+                    LanguageService.tr('daily_notifications_desc'),
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
                     ),
                   ),
                   value: _notificationsEnabled,
-                  activeColor: kPrimaryColor,
+                  activeTrackColor: kPrimaryColor,
                   onChanged: (val) async {
                     setState(() => _notificationsEnabled = val);
                     await AiCoachService.setNotificationsEnabled(val);
@@ -289,4 +298,3 @@ https://github.com/codewithyogeshh/HABIT-NOVA.APK''';
     );
   }
 }
-

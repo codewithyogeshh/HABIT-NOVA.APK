@@ -170,6 +170,7 @@ class AppWidgetService {
       }
 
       await _channel.invokeMethod('updateWidgetData', {
+        'userId': SupabaseService.user?.id ?? 'guest',
         'username': username,
         'streak': streakStr,
         'habitsCount': habitsCountStr,

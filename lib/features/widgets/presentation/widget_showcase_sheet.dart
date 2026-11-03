@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
+import 'package:synvero/core/services/language_service.dart';
 
 class WidgetShowcaseSheet extends StatefulWidget {
   final int streakDays;
@@ -28,16 +29,25 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
       setState(() => _isPinning = false);
       if (pinned) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🎉 Widget added to Home Screen!'),
-            backgroundColor: Color(0xFF10B981),
+          SnackBar(
+            content: Text(LanguageService.tr('widget_pinned_success')),
+            backgroundColor: const Color(0xFF10B981),
           ),
         );
       } else {
+        final lang = LanguageService.currentLanguageCode;
+        String hint;
+        if (lang == LanguageService.marathi) {
+          hint = '📱 होम स्क्रीनवर रिकाम्या जागेवर बोट दाबून ठेवा (Long-press) ➔ "Widgets" निवडा ➔ "HabbitNova" जोडा.';
+        } else if (lang == LanguageService.hindi) {
+          hint = '📱 होम स्क्रीन पर खाली जगह पर लॉन्ग-प्रेस करें ➔ "Widgets" चुनें ➔ "HabbitNova" जोड़ें।';
+        } else {
+          hint = '📱 Long-press on an empty spot on your home screen ➔ Select "Widgets" ➔ Add "HabbitNova".';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('📱 होम स्क्रीनवर रिकाम्या जागेवर बोट दाबून ठेवा (Long-press) ➔ "Widgets" निवडा ➔ "HabbitNova" जोडा.'),
-            duration: Duration(seconds: 4),
+          SnackBar(
+            content: Text(hint),
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -64,7 +74,7 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
                 width: 44,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.3),
+                  color: Colors.grey.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -80,7 +90,7 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
                     const Text('📱', style: TextStyle(fontSize: 24)),
                     const SizedBox(width: 8),
                     Text(
-                      'Home Screen Aesthetic Widget',
+                      LanguageService.tr('widget_sheet_title'),
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -97,133 +107,103 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              'ॲप न उघडता फोनच्या होम स्क्रीनवर थेट सवयी टिक करा आणि प्रोग्रेस पहा!',
+              LanguageService.tr('widget_sheet_subtitle'),
               style: TextStyle(
                 fontSize: 13,
                 color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
-            // Realistic Preview of the Widget
+            // Mock Preview of the Live Android Widget
             Container(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF0A101D), Color(0xFF131D31)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4), width: 1.5),
+                color: const Color(0xFF0B132B),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.4), width: 1.5),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF38BDF8).withOpacity(0.12),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
+                  )
                 ],
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Widget Header
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.spa_rounded, color: Color(0xFF38BDF8), size: 16),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'HABIT-NOVA',
-                            style: TextStyle(
-                              color: Color(0xFF38BDF8),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        ],
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.bolt_rounded, size: 16, color: Color(0xFF10B981)),
                       ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'HabbitNova',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF97316).withOpacity(0.2),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          '🔥 ${widget.streakDays}d Streak',
-                          style: const TextStyle(
-                            color: Color(0xFFF97316),
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          '🔥 ${widget.streakDays > 0 ? widget.streakDays : 1}d Streak',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFF59E0B)),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
 
-                  // Habits Progress Box
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1E293B),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Daily Habits',
-                              style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                            Text(
-                              '${widget.habitsDone} of ${widget.habitsTotal}',
-                              style: const TextStyle(color: Color(0xFF38BDF8), fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        ClipRRect(
+                  // Progress Row
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
                           borderRadius: BorderRadius.circular(6),
                           child: LinearProgressIndicator(
-                            value: widget.habitsTotal > 0 ? (widget.habitsDone / widget.habitsTotal) : 0.8,
+                            value: widget.habitsTotal > 0 ? widget.habitsDone / widget.habitsTotal : 0.6,
                             backgroundColor: Colors.white12,
-                            valueColor: const AlwaysStoppedAnimation(Color(0xFF38BDF8)),
-                            minHeight: 6,
+                            valueColor: const AlwaysStoppedAnimation(Color(0xFF10B981)),
+                            minHeight: 8,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        '${widget.habitsDone}/${widget.habitsTotal > 0 ? widget.habitsTotal : 5} ${LanguageService.tr('habits_label')}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
-                  // Quick Mock Habit items
-                  _buildMockWidgetRow('💧 Drink Water (2.5L)', true),
-                  _buildMockWidgetRow('📖 Read Book (15 mins)', true),
-                  _buildMockWidgetRow('🧘 Meditate / Mindfulness', false),
-                  const SizedBox(height: 10),
-
-                  // Quote banner
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF064E3B).withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
-                    ),
-                    child: const Text(
-                      '✨ Consistency today builds the freedom of tomorrow.',
-                      style: TextStyle(color: Color(0xFF6EE7B7), fontSize: 11, fontStyle: FontStyle.italic),
-                    ),
-                  ),
+                  // Habits mock list
+                  _buildMockWidgetRow('Drink Water 💧', true),
+                  _buildMockWidgetRow('30m Workout 🏋️', true),
+                  _buildMockWidgetRow('Read 10 pages 📖', false),
                 ],
               ),
+            ),
+            const SizedBox(height: 20),
+
+            // Features Checklist
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFeatureBullet(LanguageService.tr('widget_feature_1'), isDark),
+                _buildFeatureBullet(LanguageService.tr('widget_feature_2'), isDark),
+                _buildFeatureBullet(LanguageService.tr('widget_feature_3'), isDark),
+              ],
             ),
             const SizedBox(height: 20),
 
@@ -245,38 +225,27 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
                       )
                     : const Icon(Icons.push_pin_rounded, color: Colors.white),
                 label: Text(
-                  _isPinning ? 'Adding...' : '📌 Add Widget to Home Screen (१-टॅप)',
+                  _isPinning ? '...' : LanguageService.tr('pin_widget_btn'),
                   style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
                 ),
                 onPressed: _isPinning ? null : _handlePinWidget,
               ),
             ),
-            const SizedBox(height: 12),
-
-            // Long Press Tip
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF64748B)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'टीप: जर थेट ॲड झाले नाही, तर फोनच्या होम स्क्रीनवर रिकाम्या जागी बोट दाबून धरा ➔ Widgets ➔ "HabbitNova" निवडा.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFeatureBullet(String text, bool isDark) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+          fontWeight: FontWeight.w500,
         ),
       ),
     );
@@ -306,4 +275,3 @@ class _WidgetShowcaseSheetState extends State<WidgetShowcaseSheet> {
     );
   }
 }
-

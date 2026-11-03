@@ -531,7 +531,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: Text(
-                                        'DAILY MOTIVATION ✨',
+                                        LanguageService.tr('daily_motivation'),
                                         style: TextStyle(
                                           color: Colors.white.withValues(alpha: 0.95),
                                           fontSize: 10,
@@ -622,7 +622,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Today's Progress",
+                            LanguageService.tr('today_progress'),
                             style: TextStyle(
                               color: kTextColor,
                               fontSize: 17,
@@ -771,7 +771,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     icon: Icons.timer_outlined,
                                     iconColor: const Color(0xFF3B66FF),
                                     bgColor: isDark ? const Color(0xFF1E2D48) : const Color(0xFFEEF2FF),
-                                    title: 'Study Time',
+                                    title: LanguageService.tr('study_time'),
                                     value: _studyMinutes == 0
                                         ? '0m'
                                         : (_studyMinutes >= 60
@@ -784,7 +784,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     icon: Icons.checklist_rounded,
                                     iconColor: const Color(0xFF10B981),
                                     bgColor: isDark ? const Color(0xFF132E27) : const Color(0xFFD1FAE5),
-                                    title: 'Tasks Done',
+                                    title: LanguageService.tr('active_tasks'),
                                     value: '$_tasksDoneCount/$_tasksTotalCount',
                                     isDark: isDark,
                                   ),
@@ -793,7 +793,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     icon: Icons.local_fire_department_rounded,
                                     iconColor: const Color(0xFFF59E0B),
                                     bgColor: isDark ? const Color(0xFF332511) : const Color(0xFFFEF3C7),
-                                    title: 'Streak',
+                                    title: LanguageService.tr('day_streak'),
                                     value: '$_streakDays ${_streakDays == 1 ? "day" : "days"}',
                                     isDark: isDark,
                                   ),
@@ -811,7 +811,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Quick Actions',
+                            LanguageService.tr('quick_actions'),
                             style: TextStyle(
                               color: kTextColor,
                               fontSize: 17,
@@ -909,7 +909,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                             const SizedBox(width: 14),
                             _buildQuickActionButton(
                               icon: Icons.groups_rounded,
-                              label: 'Squads ⚔️',
+                              label: LanguageService.tr('squads'),
                               color: const Color(0xFFEC4899),
                               bgColor: const Color(0xFFFCE7F3),
                               isDark: isDark,
@@ -920,7 +920,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                             const SizedBox(width: 14),
                             _buildQuickActionButton(
                               icon: Icons.photo_camera_back_rounded,
-                              label: 'Story Card 📸',
+                              label: LanguageService.tr('story_card'),
                               color: const Color(0xFFF59E0B),
                               bgColor: const Color(0xFFFEF3C7),
                               isDark: isDark,
@@ -929,7 +929,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                             const SizedBox(width: 14),
                             _buildQuickActionButton(
                               icon: Icons.psychology_alt_rounded,
-                              label: 'AI Coach 🤖',
+                              label: LanguageService.tr('ai_coach'),
                               color: const Color(0xFFF97316),
                               bgColor: const Color(0xFFFFEDD5),
                               isDark: isDark,
@@ -938,7 +938,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                             const SizedBox(width: 14),
                             _buildQuickActionButton(
                               icon: Icons.widgets_rounded,
-                              label: 'Widget 📱',
+                              label: LanguageService.tr('home_widget'),
                               color: const Color(0xFF06B6D4),
                               bgColor: const Color(0xFFCFFAFE),
                               isDark: isDark,
@@ -972,10 +972,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFFF472B6).withOpacity(0.4)),
+                                  border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.4)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF831843).withOpacity(0.3),
+                                      color: const Color(0xFF831843).withValues(alpha: 0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1031,10 +1031,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFF2DD4BF).withOpacity(0.4)),
+                                  border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.4)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0F766E).withOpacity(0.3),
+                                      color: const Color(0xFF0F766E).withValues(alpha: 0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1090,10 +1090,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     end: Alignment.bottomRight,
                                   ),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFF38BDF8).withOpacity(0.4)),
+                                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF0369A1).withOpacity(0.3),
+                                      color: const Color(0xFF0369A1).withValues(alpha: 0.3),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -1142,7 +1142,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            "Today's Habits",
+                            LanguageService.tr('today_habits'),
                             style: TextStyle(
                               color: kTextColor,
                               fontSize: 17,
@@ -1262,7 +1262,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Lifestyle & Wellness',
+                            LanguageService.tr('lifestyle_wellness'),
                             style: TextStyle(
                               color: kTextColor,
                               fontSize: 17,
@@ -1320,7 +1320,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
-                                      'Nutrition Plan',
+                                      LanguageService.tr('nutrition_plan'),
                                       style: TextStyle(
                                         color: kTextColor,
                                         fontSize: 14,
@@ -1372,7 +1372,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     ),
                                     const SizedBox(height: 10),
                                     Text(
-                                      'Fitness Plan',
+                                      LanguageService.tr('fitness_plan'),
                                       style: TextStyle(
                                         color: kTextColor,
                                         fontSize: 14,

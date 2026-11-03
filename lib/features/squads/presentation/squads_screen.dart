@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/app/theme/app_colors.dart';
+import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/squad_service.dart';
 
 class SquadsScreen extends StatefulWidget {
@@ -14,6 +15,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
   List<Squad> _squads = [];
   int _selectedSquadIndex = 0;
   bool _isLoading = true;
+  bool _isRefreshing = false;
 
   @override
   void initState() {
@@ -32,6 +34,27 @@ class _SquadsScreenState extends State<SquadsScreen> {
           _selectedSquadIndex = 0;
         }
       });
+      // Background refresh current squad from cloud
+      if (_squads.isNotEmpty) {
+        _refreshActiveSquad();
+      }
+    }
+  }
+
+  Future<void> _refreshActiveSquad() async {
+    if (_squads.isEmpty || _selectedSquadIndex >= _squads.length) return;
+    setState(() => _isRefreshing = true);
+    try {
+      final active = _squads[_selectedSquadIndex];
+      final updated = await SquadService.refreshSquad(active);
+      if (mounted) {
+        setState(() {
+          _squads[_selectedSquadIndex] = updated;
+          _isRefreshing = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -60,7 +83,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 20,
                     offset: const Offset(0, -4),
                   )
@@ -76,14 +99,14 @@ class _SquadsScreenState extends State<SquadsScreen> {
                         width: 48,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.4),
+                          color: Colors.grey.withValues(alpha: 0.4),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      '⚔️ Create New Squad',
+                      LanguageService.tr('create_squad_sheet_title'),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -92,7 +115,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      'मित्रांसोबत स्पर्धा करा आणि रोज सवयी पूर्ण करा!',
+                      LanguageService.tr('create_squad_sheet_subtitle'),
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
@@ -102,7 +125,8 @@ class _SquadsScreenState extends State<SquadsScreen> {
                     TextField(
                       controller: nameCtrl,
                       decoration: InputDecoration(
-                        labelText: 'Squad Name (उदा. MPSC Warriors)',
+                        labelText: LanguageService.tr('squad_name'),
+                        hintText: 'e.g. MPSC Warriors, Coding Gang',
                         filled: true,
                         fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
@@ -113,9 +137,9 @@ class _SquadsScreenState extends State<SquadsScreen> {
                     ),
                     const SizedBox(height: 14),
                     DropdownButtonFormField<String>(
-                      value: category,
+                      initialValue: category,
                       decoration: InputDecoration(
-                        labelText: 'Category',
+                        labelText: LanguageService.tr('squad_category'),
                         filled: true,
                         fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
@@ -125,12 +149,23 @@ class _SquadsScreenState extends State<SquadsScreen> {
                       ),
                       dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                       items: [
-                        'Study & Exams',
-                        'Coding & Tech',
-                        'Fitness & Gym',
-                        'Deep Focus',
-                        'General Productivity',
-                      ].map((cat) => DropdownMenuItem(value: cat, child: Text(cat))).toList(),
+                        DropdownMenuItem(
+                          value: 'Study & Exams',
+                          child: Text(LanguageService.tr('category_study')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Coding & Tech',
+                          child: Text(LanguageService.tr('category_coding')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'Fitness & Gym',
+                          child: Text(LanguageService.tr('category_fitness')),
+                        ),
+                        DropdownMenuItem(
+                          value: 'General Focus',
+                          child: Text(LanguageService.tr('category_general')),
+                        ),
+                      ],
                       onChanged: (val) {
                         if (val != null) setModalState(() => category = val);
                       },
@@ -139,8 +174,8 @@ class _SquadsScreenState extends State<SquadsScreen> {
                     TextField(
                       controller: mottoCtrl,
                       decoration: InputDecoration(
-                        labelText: 'Squad Motto (ध्येयवाक्य)',
-                        hintText: 'कष्ट आज, यश उद्या!',
+                        labelText: LanguageService.tr('squad_motto'),
+                        hintText: 'e.g. Hard work in silence, success makes noise.',
                         filled: true,
                         fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                         border: OutlineInputBorder(
@@ -172,15 +207,15 @@ class _SquadsScreenState extends State<SquadsScreen> {
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
-                                content: Text('🎉 Squad "${squad.name}" created! Code: ${squad.code}'),
+                                content: Text('${LanguageService.tr('squad_created_success')} (Code: ${squad.code})'),
                                 backgroundColor: const Color(0xFF10B981),
                               ),
                             );
                           }
                         },
-                        child: const Text(
-                          '🚀 Create Squad & Get Code',
-                          style: TextStyle(
+                        child: Text(
+                          LanguageService.tr('create_squad_btn'),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -209,14 +244,14 @@ class _SquadsScreenState extends State<SquadsScreen> {
           backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text(
-            '🔑 Join Squad with Code',
-            style: TextStyle(color: isDark ? Colors.white : kDarkText),
+            LanguageService.tr('join_squad_sheet_title'),
+            style: TextStyle(color: isDark ? Colors.white : kDarkText, fontWeight: FontWeight.bold),
           ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'तुमच्या मित्राने पाठवलेला ६-अक्षरी कोड टाका:',
+                LanguageService.tr('join_squad_sheet_subtitle'),
                 style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : kSecondaryText),
               ),
               const SizedBox(height: 16),
@@ -231,7 +266,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
                   fontWeight: FontWeight.bold,
                 ),
                 decoration: InputDecoration(
-                  hintText: 'MPSC26',
+                  hintText: 'NOVA84',
                   filled: true,
                   fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                   border: OutlineInputBorder(
@@ -245,7 +280,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(LanguageService.tr('cancel')),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -255,21 +290,29 @@ class _SquadsScreenState extends State<SquadsScreen> {
               onPressed: () async {
                 final code = codeCtrl.text.trim();
                 if (code.isEmpty) return;
+                final messenger = ScaffoldMessenger.of(context);
                 Navigator.pop(ctx);
                 final joined = await SquadService.joinSquad(code);
                 await _loadSquads();
                 if (mounted) {
                   if (joined != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    messenger.showSnackBar(
                       SnackBar(
-                        content: Text('🎉 Joined Squad "${joined.name}" successfully!'),
+                        content: Text(LanguageService.tr('squad_join_success')),
                         backgroundColor: const Color(0xFF10B981),
+                      ),
+                    );
+                  } else {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(LanguageService.tr('squad_not_found')),
+                        backgroundColor: const Color(0xFFEF4444),
                       ),
                     );
                   }
                 }
               },
-              child: const Text('Join Squad', style: TextStyle(color: Colors.white)),
+              child: Text(LanguageService.tr('join_squad_btn'), style: const TextStyle(color: Colors.white)),
             ),
           ],
         );
@@ -294,20 +337,20 @@ class _SquadsScreenState extends State<SquadsScreen> {
     return Scaffold(
       backgroundColor: kBgColor,
       appBar: AppBar(
-        title: const Text(
-          '⚔️ Habit Squads & Battles',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        title: Text(
+          LanguageService.tr('squads_title'),
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
         backgroundColor: isDark ? const Color(0xFF0F172A) : Colors.white,
         elevation: 0,
         actions: [
           IconButton(
-            tooltip: 'Join with Code',
+            tooltip: LanguageService.tr('join_squad_btn'),
             icon: const Icon(Icons.group_add_rounded, color: kPrimaryColor),
             onPressed: _showJoinSquadDialog,
           ),
           IconButton(
-            tooltip: 'Create New Squad',
+            tooltip: LanguageService.tr('create_squad_btn'),
             icon: const Icon(Icons.add_circle_outline_rounded, color: kPrimaryColor),
             onPressed: _showCreateSquadDialog,
           ),
@@ -315,227 +358,284 @@ class _SquadsScreenState extends State<SquadsScreen> {
       ),
       body: _squads.isEmpty
           ? Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('👥', style: TextStyle(fontSize: 64)),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'अजून कोणताही स्क्वॉड नाही!',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _showCreateSquadDialog,
-                    child: const Text('Create Squad'),
-                  )
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 1. Squad Selector Tabs
-                  SizedBox(
-                    height: 44,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _squads.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, idx) {
-                        if (idx == _squads.length) {
-                          return ActionChip(
-                            avatar: const Icon(Icons.add, size: 16, color: kPrimaryColor),
-                            label: const Text('New Squad'),
-                            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                            onPressed: _showCreateSquadDialog,
-                          );
-                        }
-                        final s = _squads[idx];
-                        final isSelected = idx == _selectedSquadIndex;
-                        return ChoiceChip(
-                          label: Text(s.name),
-                          selected: isSelected,
-                          selectedColor: kPrimaryColor,
-                          labelStyle: TextStyle(
-                            color: isSelected ? Colors.white : (isDark ? Colors.white70 : kDarkText),
-                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                          onSelected: (val) {
-                            if (val) setState(() => _selectedSquadIndex = idx);
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  if (activeSquad != null) ...[
-                    // 2. Active Squad Hero Card
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: isDark
-                              ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
-                              : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: kPrimaryColor.withOpacity(0.3),
-                          width: 1.5,
-                        ),
+                        color: kPrimaryColor.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      activeSquad.name,
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w900,
-                                        color: isDark ? Colors.white : kDarkText,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${activeSquad.category} • Led by ${activeSquad.leaderName}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Code Pill with 1-Tap Copy
-                              InkWell(
-                                onTap: () {
-                                  Clipboard.setData(ClipboardData(text: activeSquad.code));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('📋 Code ${activeSquad.code} copied!'),
-                                      duration: const Duration(seconds: 1),
-                                    ),
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: kPrimaryColor.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: kPrimaryColor.withOpacity(0.4)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        activeSquad.code,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: kPrimaryColor,
-                                          letterSpacing: 1.2,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      const Icon(Icons.copy_rounded, size: 14, color: kPrimaryColor),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 14),
-                          Text(
-                            '"${activeSquad.motto}"',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontSize: 13,
-                              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-
-                          // Viral WhatsApp Invite Button
-                          SizedBox(
-                            width: double.infinity,
-                            height: 48,
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF25D366), // WhatsApp Green
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                ),
-                                elevation: 3,
-                              ),
-                              icon: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
-                              label: const Text(
-                                '💬 Invite Friends on WhatsApp',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              onPressed: () {
-                                SquadService.inviteViaWhatsApp(activeSquad);
-                              },
-                            ),
-                          ),
-                        ],
+                      alignment: Alignment.center,
+                      child: const Text('⚔️', style: TextStyle(fontSize: 40)),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      LanguageService.tr('no_squads_title'),
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : kDarkText,
                       ),
                     ),
-                    const SizedBox(height: 20),
-
-                    // 3. Squad Live Battle Rankings Header
+                    const SizedBox(height: 8),
+                    Text(
+                      LanguageService.tr('no_squads_desc'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
+                        height: 1.4,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          '🏆 Live Battle Standings (${activeSquad.members.length} Members)',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: isDark ? Colors.white : kDarkText,
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimaryColor,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          onPressed: _showCreateSquadDialog,
+                          icon: const Icon(Icons.add_rounded, color: Colors.white, size: 18),
+                          label: Text(
+                            LanguageService.tr('create_squad_btn'),
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        Text(
-                          'Today\'s Stats',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark ? const Color(0xFF64748B) : kSecondaryText,
+                        const SizedBox(width: 12),
+                        OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            side: const BorderSide(color: kPrimaryColor),
+                          ),
+                          onPressed: _showJoinSquadDialog,
+                          icon: const Icon(Icons.group_add_rounded, color: kPrimaryColor, size: 18),
+                          label: Text(
+                            LanguageService.tr('join_squad_btn'),
+                            style: const TextStyle(color: kPrimaryColor, fontWeight: FontWeight.bold),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-
-                    // 4. Members List
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: activeSquad.members.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, mIdx) {
-                        final m = activeSquad.members[mIdx];
-                        return _buildMemberCard(m, mIdx + 1, isDark);
-                      },
-                    ),
                   ],
-                ],
+                ),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _refreshActiveSquad,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 1. Squad Selector Tabs
+                    SizedBox(
+                      height: 44,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _squads.length + 1,
+                        separatorBuilder: (_, _) => const SizedBox(width: 8),
+                        itemBuilder: (context, idx) {
+                          if (idx == _squads.length) {
+                            return ActionChip(
+                              avatar: const Icon(Icons.add, size: 16, color: kPrimaryColor),
+                              label: Text(LanguageService.tr('create_squad_btn')),
+                              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                              onPressed: _showCreateSquadDialog,
+                            );
+                          }
+                          final s = _squads[idx];
+                          final isSelected = idx == _selectedSquadIndex;
+                          return ChoiceChip(
+                            label: Text(s.name),
+                            selected: isSelected,
+                            selectedColor: kPrimaryColor,
+                            labelStyle: TextStyle(
+                              color: isSelected ? Colors.white : (isDark ? Colors.white70 : kDarkText),
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                            onSelected: (val) {
+                              if (val) setState(() => _selectedSquadIndex = idx);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    if (activeSquad != null) ...[
+                      // 2. Active Squad Hero Card
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: isDark
+                                ? [const Color(0xFF1E1B4B), const Color(0xFF0F172A)]
+                                : [const Color(0xFFEEF2FF), const Color(0xFFE0E7FF)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: kPrimaryColor.withValues(alpha: 0.3),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        activeSquad.name,
+                                        style: TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w900,
+                                          color: isDark ? Colors.white : kDarkText,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${activeSquad.category} • ${activeSquad.leaderName}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Code Pill with 1-Tap Copy
+                                InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(ClipboardData(text: activeSquad.code));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('${LanguageService.tr('code_copied')} (${activeSquad.code})'),
+                                        duration: const Duration(seconds: 1),
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: kPrimaryColor.withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(color: kPrimaryColor.withValues(alpha: 0.4)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          activeSquad.code,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: kPrimaryColor,
+                                            letterSpacing: 1.2,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        const Icon(Icons.copy_rounded, size: 14, color: kPrimaryColor),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            Text(
+                              '"${activeSquad.motto}"',
+                              style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                fontSize: 13,
+                                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
+                              ),
+                            ),
+                            const SizedBox(height: 18),
+
+                            // Viral WhatsApp Invite Button
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF25D366),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  elevation: 3,
+                                ),
+                                icon: const Icon(Icons.share_rounded, color: Colors.white, size: 20),
+                                label: Text(
+                                  LanguageService.tr('invite_whatsapp'),
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  SquadService.inviteViaWhatsApp(activeSquad);
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 3. Squad Live Battle Rankings Header
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '🏆 ${LanguageService.tr('battle_standings')} (${activeSquad.members.length})',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : kDarkText,
+                            ),
+                          ),
+                          if (_isRefreshing)
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // 4. Members List
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: activeSquad.members.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: 10),
+                        itemBuilder: (context, mIdx) {
+                          final m = activeSquad.members[mIdx];
+                          return _buildMemberCard(m, mIdx + 1, isDark);
+                        },
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
     );
@@ -546,10 +646,10 @@ class _SquadsScreenState extends State<SquadsScreen> {
     Color cardBg = isDark ? const Color(0xFF0F172A) : Colors.white;
 
     if (member.isMVP) {
-      cardBorder = const Color(0xFFF59E0B); // Gold
+      cardBorder = const Color(0xFFF59E0B);
       cardBg = isDark ? const Color(0xFF1E1708) : const Color(0xFFFFFBEB);
     } else if (member.isSlacker) {
-      cardBorder = const Color(0xFFEF4444).withOpacity(0.6); // Red Alert
+      cardBorder = const Color(0xFFEF4444).withValues(alpha: 0.6);
       cardBg = isDark ? const Color(0xFF230D0D) : const Color(0xFFFEF2F2);
     }
 
@@ -561,7 +661,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
         border: Border.all(color: cardBorder, width: member.isMVP ? 1.8 : 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -594,7 +694,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
               const SizedBox(width: 12),
 
               // Avatar
-              Text(member.avatar, style: const TextStyle(fontSize: 24)),
+              Text(member.avatar.length <= 4 ? member.avatar : '🦁', style: const TextStyle(fontSize: 24)),
               const SizedBox(width: 10),
 
               // Name & Streak
@@ -620,12 +720,12 @@ class _SquadsScreenState extends State<SquadsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF59E0B).withOpacity(0.2),
+                              color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              'MVP',
-                              style: TextStyle(
+                            child: Text(
+                              LanguageService.tr('mvp_tag'),
+                              style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFFF59E0B),
@@ -638,12 +738,12 @@ class _SquadsScreenState extends State<SquadsScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withOpacity(0.2),
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: const Text(
-                              '🐢 Slacker (आळशी)',
-                              style: TextStyle(
+                            child: Text(
+                              LanguageService.tr('slacker_tag'),
+                              style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w900,
                                 color: Color(0xFFEF4444),
@@ -655,7 +755,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '🔥 ${member.streakDays} Day Streak • ${member.completedHabitsCount}/5 Habits done',
+                      '🔥 ${member.streakDays} ${LanguageService.tr('streak_label')} • ${member.completedHabitsCount}/5 ${LanguageService.tr('habits_label')}',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDark ? const Color(0xFF94A3B8) : kSecondaryText,
@@ -674,14 +774,14 @@ class _SquadsScreenState extends State<SquadsScreen> {
             children: [
               _buildMetricChip(
                 icon: Icons.timer_rounded,
-                label: 'Study Time',
+                label: LanguageService.tr('study_label'),
                 value: '${member.studyMinutesToday}m',
                 color: const Color(0xFF10B981),
                 isDark: isDark,
               ),
               _buildMetricChip(
                 icon: Icons.phone_android_rounded,
-                label: 'Screen Time',
+                label: LanguageService.tr('screen_label'),
                 value: '${member.screenTimeMinutesToday}m',
                 color: member.screenTimeMinutesToday > 120
                     ? const Color(0xFFEF4444)
@@ -690,7 +790,7 @@ class _SquadsScreenState extends State<SquadsScreen> {
               ),
               _buildMetricChip(
                 icon: Icons.check_circle_outline_rounded,
-                label: 'Habits Done',
+                label: LanguageService.tr('habits_label'),
                 value: '${member.completedHabitsCount}',
                 color: kPrimaryColor,
                 isDark: isDark,
@@ -746,4 +846,3 @@ class _SquadsScreenState extends State<SquadsScreen> {
     );
   }
 }
-
