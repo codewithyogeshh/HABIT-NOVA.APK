@@ -16,12 +16,8 @@ import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/features/auth/data/auth_repository.dart';
 import 'package:synvero/features/auth/presentation/login_screen.dart';
 import 'package:synvero/features/auth/presentation/signup_screen.dart';
-import 'package:synvero/features/dashboard/presentation/dashboard_screen.dart';
-import 'package:synvero/features/habits/presentation/habit_screen.dart';
-import 'package:synvero/features/timer/presentation/study_timer_screen.dart';
-import 'package:synvero/features/tasks/presentation/tasks_screen.dart';
+import 'package:synvero/core/navigation/main_app_shell.dart';
 import 'package:synvero/features/ai_assistant/presentation/ai_assistant_screen.dart';
-import 'package:synvero/features/profile/presentation/profile_screen.dart';
 import 'package:synvero/features/nutrition/presentation/nutrition_screen.dart';
 import 'package:synvero/core/services/theme_service.dart';
 import 'package:synvero/features/fitness/presentation/fitness_screen.dart';
@@ -331,25 +327,25 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return SmoothPageRoute(
               settings: settings,
               transitionType: RouteTransitionType.fadeScale,
-              child: const DashboardScreen(),
+              child: const MainAppShell(initialTab: 0),
             );
           case '/habits':
             return SmoothPageRoute(
               settings: settings,
               transitionType: RouteTransitionType.habitsRise,
-              child: const HabitScreen(),
+              child: const MainAppShell(initialTab: 1),
             );
           case '/timer':
             return SmoothPageRoute(
               settings: settings,
               transitionType: RouteTransitionType.timerPortal,
-              child: const StudyTimerScreen(),
+              child: const MainAppShell(initialTab: 2),
             );
           case '/tasks':
             return SmoothPageRoute(
               settings: settings,
               transitionType: RouteTransitionType.tasksGlide,
-              child: const TasksScreen(),
+              child: const MainAppShell(initialTab: 3),
             );
           case '/ai_assistant':
           case '/ai-assistant':
@@ -362,7 +358,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
             return SmoothPageRoute(
               settings: settings,
               transitionType: RouteTransitionType.profileSanctuary,
-              child: const ProfileScreen(),
+              child: const MainAppShell(initialTab: 4),
             );
           case '/nutrition':
             return SmoothPageRoute(
@@ -399,7 +395,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
               return SmoothPageRoute(
                 settings: settings,
                 transitionType: RouteTransitionType.fadeScale,
-                child: const DashboardScreen(),
+                child: const MainAppShell(initialTab: 0),
               );
             }
             return SmoothPageRoute(

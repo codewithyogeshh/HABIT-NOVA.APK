@@ -7,10 +7,11 @@ import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:synvero/core/widgets/spring_pressable.dart';
 import 'package:synvero/core/widgets/ambient_mesh_background.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
+import 'package:synvero/core/widgets/sliding_pill_tab_bar.dart';
+import 'package:synvero/core/widgets/gooey_drop_notification.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
@@ -38,7 +39,8 @@ import 'package:synvero/features/widgets/presentation/widget_showcase_sheet.dart
 /// - Lifestyle & Wellness: Nutrition Plan & Fitness Plan cards
 /// - Bottom Navigation Bar with 5 tabs: Home, Habits, Timer, Tasks, Profile
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final bool isEmbedded;
+  const DashboardScreen({super.key, this.isEmbedded = false});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -181,9 +183,11 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Future<void> _loadProfile() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (_username == null) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       final user = SupabaseService.user;
@@ -464,11 +468,74 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                               ],
                             ),
                           ),
-                          UserAvatar(
-                            size: 46,
-                            onTap: () {
-                              Navigator.of(context).pushNamed('/profile');
-                            },
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              GestureDetector(
+                                onTap: () {
+                                  HapticFeedback.mediumImpact();
+                                  GooeyNotification.show(
+                                    context,
+                                    title: 'Nova Focus Daily 🚀',
+                                    message: '$_streakDays-Day Streak active! Keep the momentum going.',
+                                    icon: Icons.local_fire_department_rounded,
+                                    type: GooeyNotificationType.streak,
+                                  );
+                                },
+                                child: Container(
+                                  width: 40,
+                                  height: 40,
+                                  margin: const EdgeInsets.only(right: 10),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.3) : const Color(0xFFCBD5E1),
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.notifications_none_rounded,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                        size: 20,
+                                      ),
+                                      Positioned(
+                                        top: 9,
+                                        right: 9,
+                                        child: Container(
+                                          width: 7,
+                                          height: 7,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF00E5FF),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Color(0xFF00E5FF),
+                                                blurRadius: 6,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              UserAvatar(
+                                size: 46,
+                                onTap: () {
+                                  Navigator.of(context).pushNamed('/profile');
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -1413,93 +1480,60 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               ),
       ),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF071728).withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.22) : const Color(0xFFE2E8F0),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: BottomNavigationBar(
-                  currentIndex: _currentTabIndex,
-                  elevation: 0,
-                  onTap: (index) {
-                    setState(() {
-                      _currentTabIndex = index;
-                    });
-                    if (index == 1) {
-                      Navigator.of(context).pushNamed('/habits').then((_) {
-                        if (mounted) setState(() => _currentTabIndex = 0);
-                        _loadProfile();
-                      });
-                    } else if (index == 2) {
-                      Navigator.of(context).pushNamed('/timer').then((_) {
-                        if (mounted) setState(() => _currentTabIndex = 0);
-                      });
-                    } else if (index == 3) {
-                      Navigator.of(context).pushNamed('/tasks').then((_) {
-                        if (mounted) setState(() => _currentTabIndex = 0);
-                      });
-                    } else if (index == 4) {
-                      Navigator.of(context).pushNamed('/profile').then((_) {
-                        if (mounted) setState(() => _currentTabIndex = 0);
-                      });
-                    }
-                  },
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  selectedItemColor: isDark ? const Color(0xFF00F0FF) : kPrimaryColor,
-                  unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                  selectedLabelStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  items: const [
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.home_rounded),
-                      label: 'Home',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.calendar_today_rounded),
-                      label: 'Habits',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.timer_outlined),
-                      label: 'Timer',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.checklist_rounded),
-                      label: 'Tasks',
-                    ),
-                    BottomNavigationBarItem(
-                      icon: Icon(Icons.person_outline_rounded),
-                      label: 'Profile',
-                    ),
-                  ],
-                ),
-              ),
+      bottomNavigationBar: widget.isEmbedded ? null : SafeArea(
+        child: SlidingPillNavBar(
+          currentIndex: _currentTabIndex,
+          isDark: isDark,
+          onTap: (index) {
+            setState(() {
+              _currentTabIndex = index;
+            });
+            if (index == 1) {
+              Navigator.of(context).pushNamed('/habits').then((_) {
+                if (mounted) setState(() => _currentTabIndex = 0);
+                _loadProfile();
+              });
+            } else if (index == 2) {
+              Navigator.of(context).pushNamed('/timer').then((_) {
+                if (mounted) setState(() => _currentTabIndex = 0);
+              });
+            } else if (index == 3) {
+              Navigator.of(context).pushNamed('/tasks').then((_) {
+                if (mounted) setState(() => _currentTabIndex = 0);
+              });
+            } else if (index == 4) {
+              Navigator.of(context).pushNamed('/profile').then((_) {
+                if (mounted) setState(() => _currentTabIndex = 0);
+              });
+            }
+          },
+          items: const [
+            SlidingPillItem(
+              icon: Icons.home_outlined,
+              activeIcon: Icons.home_rounded,
+              label: 'Home',
             ),
-          ),
+            SlidingPillItem(
+              icon: Icons.calendar_today_outlined,
+              activeIcon: Icons.calendar_month_rounded,
+              label: 'Habits',
+            ),
+            SlidingPillItem(
+              icon: Icons.timer_outlined,
+              activeIcon: Icons.timer_rounded,
+              label: 'Timer',
+            ),
+            SlidingPillItem(
+              icon: Icons.checklist_rounded,
+              activeIcon: Icons.task_alt_rounded,
+              label: 'Tasks',
+            ),
+            SlidingPillItem(
+              icon: Icons.person_outline_rounded,
+              activeIcon: Icons.person_rounded,
+              label: 'Profile',
+            ),
+          ],
         ),
       ),
     ),

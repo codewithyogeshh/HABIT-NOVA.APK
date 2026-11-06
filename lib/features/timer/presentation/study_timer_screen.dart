@@ -19,7 +19,8 @@ import 'package:synvero/features/timer/presentation/focus_sound_selector_widget.
 /// - Daily focus stats row: "Today's Sessions" | "Total Study Time"
 /// - Bottom Navigation Bar (dark styled)
 class StudyTimerScreen extends StatefulWidget {
-  const StudyTimerScreen({super.key});
+  final bool isEmbedded;
+  const StudyTimerScreen({super.key, this.isEmbedded = false});
 
   @override
   State<StudyTimerScreen> createState() => _StudyTimerScreenState();

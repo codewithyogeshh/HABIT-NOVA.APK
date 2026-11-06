@@ -6,6 +6,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
+import 'package:synvero/core/widgets/gooey_drop_notification.dart';
 
 /// AdMob Rewarded Ad & Study Squad Credit System.
 ///
@@ -255,11 +256,12 @@ class AdCreditService {
           earnedReward = true;
           await addCredits(kCreditsPerAd, reason: 'Watched Rewarded Ad');
           if (context.mounted) {
-            CelebrationDialog.show(
+            GooeyNotification.show(
               context,
-              title: '+$kCreditsPerAd Credits Earned! 🪙',
-              subtitle: 'Study Group creation points added to your balance!',
-              streakDays: 0,
+              title: '+$kCreditsPerAd Nova Credits! 🪙',
+              message: 'Study Squad wallet loaded! Ready to create squad.',
+              icon: Icons.monetization_on_rounded,
+              type: GooeyNotificationType.reward,
             );
           }
         },

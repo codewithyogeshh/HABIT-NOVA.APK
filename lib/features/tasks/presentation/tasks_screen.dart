@@ -14,7 +14,8 @@ import 'package:synvero/features/tasks/presentation/family_nag_widget.dart';
 
 /// Tasks screen with real-time push notifications, loud alarms, and dynamic user scheduling.
 class TasksScreen extends StatefulWidget {
-  const TasksScreen({super.key});
+  final bool isEmbedded;
+  const TasksScreen({super.key, this.isEmbedded = false});
 
   @override
   State<TasksScreen> createState() => _TasksScreenState();
@@ -36,7 +37,7 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _loadTasks() async {
-    setState(() => _isLoading = true);
+    if (_tasks.isEmpty) setState(() => _isLoading = true);
 
     try {
       final user = SupabaseService.user;
@@ -432,16 +433,19 @@ class _TasksScreenState extends State<TasksScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              Navigator.of(context).pushReplacementNamed('/dashboard');
-            }
-          },
-        ),
+        automaticallyImplyLeading: !widget.isEmbedded,
+        leading: widget.isEmbedded
+            ? null
+            : IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context).pushReplacementNamed('/dashboard');
+                  }
+                },
+              ),
         title: Text(
           'Tasks',
           style: TextStyle(
@@ -751,7 +755,7 @@ class _TasksScreenState extends State<TasksScreen> {
               ),
       ),
       ),
-      bottomNavigationBar: SafeArea(
+      bottomNavigationBar: widget.isEmbedded ? null : SafeArea(
         child: Container(
           margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
           child: ClipRRect(

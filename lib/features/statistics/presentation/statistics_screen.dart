@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:synvero/core/widgets/ambient_mesh_background.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/services/app_limit_service.dart';
+import 'package:synvero/core/services/ad_credit_service.dart';
+import 'package:synvero/core/widgets/sliding_pill_tab_bar.dart';
+import 'package:synvero/core/widgets/gooey_drop_notification.dart';
 
 /// Screen displaying real-time daily screen time, exact second-by-second updates,
 /// day-by-day historical phone usage breakdown, real installed apps with Digital Wellbeing limits,
@@ -613,30 +616,25 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                   ),
                 ],
 
-                // Segmented Switcher: [📱 Screen Time] [🌐 Data Usage]
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF071728) : const Color(0xFFE2E8F0),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: kBorderColor),
-                  ),
-                  child: Row(
-                    children: [
-                      _buildSegmentTab(
-                        index: 0,
-                        label: 'Screen Time',
-                        icon: Icons.smartphone_rounded,
-                        isDark: isDark,
-                      ),
-                      _buildSegmentTab(
-                        index: 1,
-                        label: 'Data Usage',
-                        icon: Icons.public_rounded,
-                        isDark: isDark,
-                      ),
-                    ],
-                  ),
+                // Segmented Switcher with Animated Sliding Pill
+                SlidingPillSegmentedBar(
+                  selectedIndex: _selectedTab,
+                  isDark: isDark,
+                  onTabSelected: (index) {
+                    setState(() {
+                      _selectedTab = index;
+                    });
+                  },
+                  tabs: const [
+                    SlidingPillItem(
+                      icon: Icons.smartphone_rounded,
+                      label: 'Screen Time',
+                    ),
+                    SlidingPillItem(
+                      icon: Icons.public_rounded,
+                      label: 'Data Usage',
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 16),
@@ -1636,7 +1634,51 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                   const SizedBox(height: 22),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.play_circle_fill_rounded, size: 20),
+                      label: const Text(
+                        'Watch Ad for +15 Min Pass 🎬',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      ),
+                      onPressed: () async {
+                        Navigator.of(ctx).pop();
+                        await AdCreditService.showRewardedAd(
+                          context: context,
+                          onRewardGranted: () async {
+                            final newLimit = usageMinutes + 15;
+                            await AppLimitService.setLimit(
+                              appName,
+                              newLimit,
+                              packageName: packageName,
+                            );
+                            await _loadAllStats();
+                            if (context.mounted) {
+                              GooeyNotification.show(
+                                context,
+                                title: '+15 Min Pass Unlocked! ⚡',
+                                message: 'Emergency access granted for $appName (+50 Credits 🪙)',
+                                icon: Icons.bolt_rounded,
+                                type: GooeyNotificationType.reward,
+                              );
+                            }
+                          },
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E5FF),
+                        foregroundColor: const Color(0xFF030814),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
                       onPressed: () {
                         Navigator.of(ctx).pop();
                         _showSetLimitSheet(
@@ -1649,18 +1691,20 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                           gradient: gradient,
                         );
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00E5FF),
-                        foregroundColor: const Color(0xFF030814),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: const Color(0xFF00E5FF).withValues(alpha: 0.5)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        elevation: 0,
                       ),
                       child: const Text(
                         'Adjust / Remove Limit',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                        style: TextStyle(
+                          color: Color(0xFF00E5FF),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -1682,6 +1726,105 @@ class _StatisticsScreenState extends State<StatisticsScreen>
           ),
         );
       },
+    );
+  }
+
+  void _confirmAdAction({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required String actionButtonText,
+    required VoidCallback onConfirmed,
+  }) {
+    HapticFeedback.selectionClick();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (dCtx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                blurRadius: 24,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.3)),
+                ),
+                child: const Icon(Icons.ondemand_video_rounded, color: Color(0xFF00E5FF), size: 30),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                title,
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                message,
+                style: TextStyle(
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  fontSize: 13,
+                  height: 1.4,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.play_circle_fill_rounded, size: 20),
+                  label: Text(actionButtonText, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  onPressed: () {
+                    Navigator.of(dCtx).pop();
+                    onConfirmed();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E5FF),
+                    foregroundColor: const Color(0xFF030814),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.of(dCtx).pop(),
+                child: Text(
+                  'Keep Focus Shield (मर्यादा राहू द्या)',
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -1878,19 +2021,38 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                           if (currentLimit != null) ...[
                             Expanded(
                               flex: 1,
-                              child: OutlinedButton(
-                                onPressed: () async {
-                                  final navigator = Navigator.of(bCtx);
-                                  final messenger = ScaffoldMessenger.of(context);
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.ondemand_video_rounded, size: 16, color: Colors.redAccent),
+                                label: const Text(
+                                  'Remove (Ad)',
+                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700, fontSize: 13),
+                                ),
+                                onPressed: () {
                                   HapticFeedback.mediumImpact();
-                                  await AppLimitService.removeLimit(appName, packageName: packageName);
-                                  await _loadAllStats();
-                                  navigator.pop();
-                                  messenger.showSnackBar(
-                                    SnackBar(
-                                      content: Text('Removed limit for $appName'),
-                                      backgroundColor: const Color(0xFF071728),
-                                    ),
+                                  _confirmAdAction(
+                                    context: context,
+                                    title: 'Remove Limit for $appName? 🛡️',
+                                    message: 'तुम्ही सेट केलेली मर्यादा काढण्यासाठी १ व्हिडिओ ॲड पहावी लागेल. याने तुमच्या सवयी विचलित होण्यापासून वाचतील!',
+                                    actionButtonText: 'Watch Ad to Remove 🎬',
+                                    onConfirmed: () async {
+                                      Navigator.of(bCtx).pop();
+                                      await AdCreditService.showRewardedAd(
+                                        context: context,
+                                        onRewardGranted: () async {
+                                          await AppLimitService.removeLimit(appName, packageName: packageName);
+                                          await _loadAllStats();
+                                          if (context.mounted) {
+                                            GooeyNotification.show(
+                                              context,
+                                              title: 'Limit Removed 🔓',
+                                              message: 'Focus Shield disabled for $appName (+50 Credits 🪙)',
+                                              icon: Icons.lock_open_rounded,
+                                              type: GooeyNotificationType.reward,
+                                            );
+                                          }
+                                        },
+                                      );
+                                    },
                                   );
                                 },
                                 style: OutlinedButton.styleFrom(
@@ -1900,36 +2062,75 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                                     borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
-                                child: const Text(
-                                  'Remove',
-                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700),
-                                ),
                               ),
                             ),
                             const SizedBox(width: 12),
                           ],
                           Expanded(
                             flex: 2,
-                            child: ElevatedButton(
+                            child: ElevatedButton.icon(
+                              icon: currentLimit != null && selectedMinutes != currentLimit
+                                  ? const Icon(Icons.ondemand_video_rounded, size: 18)
+                                  : const Icon(Icons.check_rounded, size: 18),
+                              label: Text(
+                                currentLimit != null && selectedMinutes != currentLimit
+                                    ? 'Update (Ad 🎬)'
+                                    : 'Save (${AppLimitService.formatMinutes(selectedMinutes)})',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
                               onPressed: () async {
-                                final navigator = Navigator.of(bCtx);
-                                final messenger = ScaffoldMessenger.of(context);
                                 HapticFeedback.mediumImpact();
-                                await AppLimitService.setLimit(
-                                  appName,
-                                  selectedMinutes,
-                                  packageName: packageName,
-                                );
-                                await _loadAllStats();
-                                navigator.pop();
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Daily limit for $appName set to ${AppLimitService.formatMinutes(selectedMinutes)} ✨ (Blocked when reached)',
+                                if (currentLimit != null && selectedMinutes != currentLimit) {
+                                  // Adjusting existing limit -> Requires Watching Ad
+                                  _confirmAdAction(
+                                    context: context,
+                                    title: 'Adjust Limit for $appName? ⏳',
+                                    message: 'तुम्ही सेट केलेली मर्यादा बदलण्यासाठी / वाढवण्यासाठी १ छोटी व्हिडिओ ॲड पहावी लागेल. (+५० Nova Credits मिळतील!)',
+                                    actionButtonText: 'Watch Ad to Adjust 🎬',
+                                    onConfirmed: () async {
+                                      Navigator.of(bCtx).pop();
+                                      await AdCreditService.showRewardedAd(
+                                        context: context,
+                                        onRewardGranted: () async {
+                                          await AppLimitService.setLimit(
+                                            appName,
+                                            selectedMinutes,
+                                            packageName: packageName,
+                                          );
+                                          await _loadAllStats();
+                                          if (context.mounted) {
+                                            GooeyNotification.show(
+                                              context,
+                                              title: 'Limit Updated! ⏳',
+                                              message: 'Daily limit for $appName set to ${AppLimitService.formatMinutes(selectedMinutes)} (+50 Credits 🪙)',
+                                              icon: Icons.shield_rounded,
+                                              type: GooeyNotificationType.reward,
+                                            );
+                                          }
+                                        },
+                                      );
+                                    },
+                                  );
+                                } else {
+                                  // Setting new initial limit (Free)
+                                  final navigator = Navigator.of(bCtx);
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  await AppLimitService.setLimit(
+                                    appName,
+                                    selectedMinutes,
+                                    packageName: packageName,
+                                  );
+                                  await _loadAllStats();
+                                  navigator.pop();
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Daily limit for $appName set to ${AppLimitService.formatMinutes(selectedMinutes)} ✨ (Blocked when reached)',
+                                      ),
+                                      backgroundColor: const Color(0xFF0E223D),
                                     ),
-                                    backgroundColor: const Color(0xFF0E223D),
-                                  ),
-                                );
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFF00E5FF),
@@ -1939,10 +2140,6 @@ class _StatisticsScreenState extends State<StatisticsScreen>
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 elevation: 0,
-                              ),
-                              child: Text(
-                                'Save Limit (${AppLimitService.formatMinutes(selectedMinutes)})',
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                               ),
                             ),
                           ),
@@ -1959,57 +2156,7 @@ class _StatisticsScreenState extends State<StatisticsScreen>
     );
   }
 
-  Widget _buildSegmentTab({
-    required int index,
-    required String label,
-    required IconData icon,
-    required bool isDark,
-  }) {
-    final isSelected = _selectedTab == index;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          setState(() {
-            _selectedTab = index;
-          });
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 9),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.2) : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            border: isSelected
-                ? Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5))
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 16,
-                color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF64748B),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF64748B),
-                  fontSize: 13,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildGridLine(String label, bool isDark) {
     return Row(

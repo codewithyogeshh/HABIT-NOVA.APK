@@ -16,7 +16,8 @@ import 'package:synvero/features/habits/presentation/water_tracker_card.dart';
 
 /// Habit Tracker screen with real user-created upcoming schedules.
 class HabitScreen extends StatefulWidget {
-  const HabitScreen({super.key});
+  final bool isEmbedded;
+  const HabitScreen({super.key, this.isEmbedded = false});
 
   @override
   State<HabitScreen> createState() => _HabitScreenState();
@@ -129,9 +130,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   String get _currentUserId => SupabaseService.user?.id ?? 'guest';
 
   Future<void> _loadData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (_habits.isEmpty) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
 
     try {
       // Automatic daily reset at midnight
@@ -521,16 +524,19 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              Navigator.of(context).pushReplacementNamed('/dashboard');
-            }
-          },
-        ),
+        automaticallyImplyLeading: !widget.isEmbedded,
+        leading: widget.isEmbedded
+            ? null
+            : IconButton(
+                icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
+                onPressed: () {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Navigator.of(context).pushReplacementNamed('/dashboard');
+                  }
+                },
+              ),
         title: Text(
           'Habits',
           style: TextStyle(

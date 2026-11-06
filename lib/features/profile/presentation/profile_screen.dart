@@ -31,7 +31,8 @@ import 'package:synvero/core/services/language_service.dart';
 /// - Danger Zone: Soft red "Log Out" button with confirmation/instant sign-out
 /// - Bottom Navigation Bar (Profile tab active)
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final bool isEmbedded;
+  const ProfileScreen({super.key, this.isEmbedded = false});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
