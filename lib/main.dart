@@ -1,3 +1,7 @@
+import 'package:synvero/core/services/ad_credit_service.dart';
+import 'package:synvero/core/navigation/custom_page_route.dart';
+import 'package:synvero/core/services/ai_coach_service.dart';
+import 'package:synvero/core/services/task_service.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/navigation/app_navigator.dart';
@@ -101,9 +105,15 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
     NotificationService.requestPermissions();
     // Check if an alarm is already ringing in background
     NotificationService.checkForActiveAlarms();
+    // Schedule all background OS alarms & reminders (Habits, Hydration, AI Roasts, Task Alarms)
+    NotificationService.scheduleDailyHabitReminders();
+    NotificationService.scheduleDailyHydrationReminders();
+    AiCoachService.scheduleDailyRoasts();
+    TaskService.rescheduleAllPendingTaskAlarms();
     // Wire up app blocker event listener
     AppLimitService.ensureHandler();
     AppLimitService.blockedAppEventNotifier.addListener(_handleBlockedAppEvent);
+    AdCreditService.initialize();
   }
 
   void _handleBlockedAppEvent() {
@@ -142,17 +152,26 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
           home: const AuthWrapper(),
           debugShowCheckedModeBanner: false,
           builder: (context, child) {
-            return ValueListenableBuilder<ActiveAlarm?>(
-              valueListenable: NotificationService.activeAlarmNotifier,
-              builder: (context, activeAlarm, _) {
-                return Stack(
-                  children: [
-                    ?child,
-                    if (activeAlarm != null)
-                      AlarmRingingDialog(alarm: activeAlarm),
-                  ],
-                );
-              },
+            final mediaQuery = MediaQuery.of(context);
+            // Universal responsiveness: Clamp font scaling to prevent RenderFlex overflow on ANY device/display settings
+            final clampedMediaQuery = mediaQuery.copyWith(
+              textScaler: mediaQuery.textScaler.clamp(minScaleFactor: 0.85, maxScaleFactor: 1.15),
+            );
+
+            return MediaQuery(
+              data: clampedMediaQuery,
+              child: ValueListenableBuilder<ActiveAlarm?>(
+                valueListenable: NotificationService.activeAlarmNotifier,
+                builder: (context, activeAlarm, _) {
+                  return Stack(
+                    children: [
+                      ?child,
+                      if (activeAlarm != null)
+                        AlarmRingingDialog(alarm: activeAlarm),
+                    ],
+                  );
+                },
+              ),
             );
           },
         );
@@ -297,48 +316,96 @@ class _AuthWrapperState extends State<AuthWrapper> {
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/login':
-            return MaterialPageRoute(
-              builder: (context) => LoginScreen(onLogin: _handleLogin),
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.fadeScale,
+              child: LoginScreen(onLogin: _handleLogin),
             );
           case '/signup':
-            return MaterialPageRoute(
-              builder: (context) => SignupScreen(onSignup: _handleSignup),
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.tasksGlide,
+              child: SignupScreen(onSignup: _handleSignup),
             );
           case '/dashboard':
-            return MaterialPageRoute(
-              builder: (context) => const DashboardScreen(),
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.fadeScale,
+              child: const DashboardScreen(),
             );
           case '/habits':
-            return MaterialPageRoute(builder: (context) => const HabitScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.habitsRise,
+              child: const HabitScreen(),
+            );
           case '/timer':
-            return MaterialPageRoute(builder: (context) => const StudyTimerScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.timerPortal,
+              child: const StudyTimerScreen(),
+            );
           case '/tasks':
-            return MaterialPageRoute(builder: (context) => const TasksScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.tasksGlide,
+              child: const TasksScreen(),
+            );
           case '/ai_assistant':
           case '/ai-assistant':
-            return MaterialPageRoute(builder: (context) => const AIAssistantScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.aiElevate,
+              child: const AIAssistantScreen(),
+            );
           case '/profile':
-            return MaterialPageRoute(builder: (context) => const ProfileScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.profileSanctuary,
+              child: const ProfileScreen(),
+            );
           case '/nutrition':
-            return MaterialPageRoute(builder: (context) => const NutritionScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.energyPulse,
+              child: const NutritionScreen(),
+            );
           case '/fitness':
-            return MaterialPageRoute(builder: (context) => const FitnessScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.energyPulse,
+              child: const FitnessScreen(),
+            );
           case '/statistics':
-            return MaterialPageRoute(builder: (context) => const StatisticsScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.statisticsUnfold,
+              child: const StatisticsScreen(),
+            );
           case '/leaderboard':
-            return MaterialPageRoute(builder: (context) => const LeaderboardScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.leaderboardPodium,
+              child: const LeaderboardScreen(),
+            );
           case '/squads':
-            return MaterialPageRoute(builder: (context) => const SquadsScreen());
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.squadsDoor,
+              child: const SquadsScreen(),
+            );
           default:
-            // If already authenticated, show dashboard
             if (_isAuthenticated) {
-              return MaterialPageRoute(
-                builder: (context) => const DashboardScreen(),
+              return SmoothPageRoute(
+                settings: settings,
+                transitionType: RouteTransitionType.fadeScale,
+                child: const DashboardScreen(),
               );
             }
-            // Otherwise show login
-            return MaterialPageRoute(
-              builder: (context) => LoginScreen(onLogin: _handleLogin),
+            return SmoothPageRoute(
+              settings: settings,
+              transitionType: RouteTransitionType.fadeScale,
+              child: LoginScreen(onLogin: _handleLogin),
             );
         }
       },

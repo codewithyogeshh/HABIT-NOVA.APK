@@ -1,3 +1,4 @@
+import 'package:timezone/timezone.dart' as tz;
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -337,25 +338,56 @@ class AiCoachService {
         channelDescription: 'Humorous, savage, and tough love habit reminders',
         importance: Importance.high,
         priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
         icon: '@mipmap/ic_launcher',
       );
-      const details = NotificationDetails(android: androidDetails);
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
 
-      // Schedule at 2:30 PM (Midday wake-up call)
-      await _notificationsPlugin.show(
+      final now = tz.TZDateTime.now(tz.local);
+
+      // 1. Midday wake-up call at 2:30 PM (14:30)
+      var middayScheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, 14, 30);
+      if (middayScheduled.isBefore(now)) {
+        middayScheduled = middayScheduled.add(const Duration(days: 1));
+      }
+      await _notificationsPlugin.zonedSchedule(
         881,
         middayTitle,
         middayBody,
+        middayScheduled,
         details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
       );
 
-      // Schedule at 8:30 PM (Evening streak savior)
-      await _notificationsPlugin.show(
+      // 2. Evening streak savior at 8:30 PM (20:30)
+      var eveningScheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, 20, 30);
+      if (eveningScheduled.isBefore(now)) {
+        eveningScheduled = eveningScheduled.add(const Duration(days: 1));
+      }
+      await _notificationsPlugin.zonedSchedule(
         882,
         eveningTitle,
         eveningBody,
+        eveningScheduled,
         details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
       );
+
+      debugPrint('Daily AI Roasts successfully scheduled with OS AlarmManager (14:30 & 20:30)!');
     } catch (e) {
       debugPrint('scheduleDailyRoasts error: $e');
     }

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:synvero/core/widgets/ambient_mesh_background.dart';
 import 'package:flutter/services.dart';
 import 'package:synvero/core/services/app_limit_service.dart';
 
-/// Screen displaying real-time daily screen time, live 7-day usage trends,
-/// real installed apps with Digital Wellbeing usage limits, and Android Focus Shield app blocking.
+/// Screen displaying real-time daily screen time, exact second-by-second updates,
+/// day-by-day historical phone usage breakdown, real installed apps with Digital Wellbeing limits,
+/// and Android Focus Shield app blocking with 100% responsive zero-overflow UI.
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
 
@@ -11,16 +14,29 @@ class StatisticsScreen extends StatefulWidget {
   State<StatisticsScreen> createState() => _StatisticsScreenState();
 }
 
-class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBindingObserver {
-  int _selectedTab = 0; // 0: Screen, 1: Data
+class _StatisticsScreenState extends State<StatisticsScreen>
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  int _selectedTab = 0; // 0: Screen Time, 1: Data Usage
+  int _selectedDayIndex = 6; // 0: 6 days ago ... 6: Today
   bool _isLoading = true;
   bool _hasUsagePermission = true;
   bool _hasAccessibilityPermission = true;
 
-  String _totalScreenTimeFormatted = '0 minutes';
+  // Real-time second-by-second ticking
+  Timer? _syncTimer;
+  int _liveTodayScreenTimeMs = 0;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+
+  String _totalScreenTimeFormatted = '0m';
   String _totalDataUsageFormatted = '0 MB today';
   List<double> _weeklyHours = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
   List<String> _weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // Day-by-day full history breakdown
+  List<Map<String, dynamic>> _dailyHistory = [];
+  Map<String, dynamic>? _customDateRecord;
+  bool _isCustomDateSelected = false;
 
   List<Map<String, dynamic>> _screenTimeApps = [];
   List<Map<String, dynamic>> _dataApps = [];
@@ -32,11 +48,23 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
     WidgetsBinding.instance.addObserver(this);
     AppLimitService.ensureHandler();
     AppLimitService.blockedAppEventNotifier.addListener(_onAppBlockedFromNative);
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.35, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
     _loadAllStats();
+    _startPeriodicSync();
   }
 
   @override
   void dispose() {
+    _syncTimer?.cancel();
+    _pulseController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     AppLimitService.blockedAppEventNotifier.removeListener(_onAppBlockedFromNative);
     super.dispose();
@@ -47,6 +75,70 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
     if (state == AppLifecycleState.resumed) {
       _loadAllStats();
     }
+  }
+
+  void _startPeriodicSync() {
+    _syncTimer?.cancel();
+    // Smooth periodic background sync with Android UsageStatsManager
+    _syncTimer = Timer.periodic(const Duration(seconds: 15), (timer) {
+      if (!mounted) return;
+      if (_selectedTab == 0 && _selectedDayIndex == 6 && !_isCustomDateSelected && !_isLoading && _hasUsagePermission) {
+        _silentBackgroundSync();
+      }
+    });
+  }
+
+  Future<void> _silentBackgroundSync() async {
+    if (!mounted || _isLoading || !_hasUsagePermission) return;
+    try {
+      final screenStats = await AppLimitService.getLiveScreenTimeStats();
+      if (!mounted) return;
+
+      final ms = (screenStats['totalScreenTimeMs'] as num?)?.toInt() ?? _liveTodayScreenTimeMs;
+      final rawDaily = (screenStats['dailyHistory'] as List?) ?? [];
+      final List<Map<String, dynamic>> dailyHist = [];
+      for (final item in rawDaily) {
+        if (item is Map) {
+          dailyHist.add(Map<String, dynamic>.from(item));
+        }
+      }
+
+      final rawScreenApps = (screenStats['apps'] as List?) ?? [];
+      final List<Map<String, dynamic>> screenApps = [];
+      for (final a in rawScreenApps) {
+        if (a is Map) {
+          final pkg = a['packageName'] as String? ?? '';
+          final name = a['appName'] as String? ?? pkg;
+          final cat = a['category'] as String? ?? 'Apps & Tools';
+          final duration = a['durationFormatted'] as String? ?? '0m';
+          final usageMins = (a['usageMinutes'] as num?)?.toInt() ?? 0;
+          final usageMs = (a['usageTimeMs'] as num?)?.toInt() ?? 0;
+          final visuals = _getAppVisuals(name, pkg, cat);
+
+          screenApps.add({
+            'packageName': pkg,
+            'name': name,
+            'duration': duration,
+            'category': cat,
+            'usageMinutes': usageMins,
+            'usageTimeMs': usageMs,
+            'icon': visuals['icon'],
+            'gradient': visuals['gradient'],
+          });
+        }
+      }
+
+      setState(() {
+        _liveTodayScreenTimeMs = ms;
+        if (_selectedDayIndex == 6 && !_isCustomDateSelected) {
+          _totalScreenTimeFormatted = AppLimitService.formatExactDuration(ms);
+          _screenTimeApps = screenApps;
+        }
+        if (dailyHist.isNotEmpty) {
+          _dailyHistory = dailyHist;
+        }
+      });
+    } catch (_) {}
   }
 
   void _onAppBlockedFromNative() {
@@ -80,6 +172,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
       final screenStats = await AppLimitService.getLiveScreenTimeStats();
       final dataStats = await AppLimitService.getLiveDataUsageStats();
 
+      final totalMs = (screenStats['totalScreenTimeMs'] as num?)?.toInt() ?? 0;
+
       // Process real screen time apps
       final rawScreenApps = (screenStats['apps'] as List?) ?? [];
       final List<Map<String, dynamic>> screenApps = [];
@@ -87,9 +181,10 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
         if (a is Map) {
           final pkg = a['packageName'] as String? ?? '';
           final name = a['appName'] as String? ?? pkg;
-          final cat = a['category'] as String? ?? 'General';
-          final duration = a['durationFormatted'] as String? ?? '0 min';
+          final cat = a['category'] as String? ?? 'Apps & Tools';
+          final duration = a['durationFormatted'] as String? ?? '0m';
           final usageMins = (a['usageMinutes'] as num?)?.toInt() ?? 0;
+          final usageMs = (a['usageTimeMs'] as num?)?.toInt() ?? 0;
           final visuals = _getAppVisuals(name, pkg, cat);
 
           screenApps.add({
@@ -98,6 +193,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
             'duration': duration,
             'category': cat,
             'usageMinutes': usageMins,
+            'usageTimeMs': usageMs,
             'icon': visuals['icon'],
             'gradient': visuals['gradient'],
           });
@@ -111,7 +207,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
         if (d is Map) {
           final pkg = d['packageName'] as String? ?? '';
           final name = d['appName'] as String? ?? pkg;
-          final cat = d['category'] as String? ?? 'General';
+          final cat = d['category'] as String? ?? 'Apps & Tools';
           final usageStr = d['usageFormatted'] as String? ?? '0 MB';
           final bytes = (d['bytes'] as num?)?.toInt() ?? 0;
           final visuals = _getAppVisuals(name, pkg, cat);
@@ -125,6 +221,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
             'icon': visuals['icon'],
             'gradient': visuals['gradient'],
           });
+        }
+      }
+
+      // Process daily history list
+      final rawDaily = (screenStats['dailyHistory'] as List?) ?? [];
+      final List<Map<String, dynamic>> dailyHist = [];
+      for (final item in rawDaily) {
+        if (item is Map) {
+          dailyHist.add(Map<String, dynamic>.from(item));
         }
       }
 
@@ -156,13 +261,17 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
         setState(() {
           _hasUsagePermission = hasUsage;
           _hasAccessibilityPermission = hasAccess;
-          _totalScreenTimeFormatted = screenStats['totalFormatted'] as String? ?? '0 minutes';
+          _liveTodayScreenTimeMs = totalMs;
+          _totalScreenTimeFormatted = AppLimitService.formatExactDuration(totalMs);
           _totalDataUsageFormatted = dataStats['totalFormatted'] as String? ?? '0 MB today';
           _weeklyHours = weeklyH;
           _weekDays = weekD;
+          _dailyHistory = dailyHist;
           _screenTimeApps = screenApps;
           _dataApps = dataApps;
           _appLimits = limits;
+          _selectedDayIndex = 6; // Default to Today
+          _isCustomDateSelected = false;
           _isLoading = false;
         });
       }
@@ -170,6 +279,86 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
       debugPrint('StatisticsScreen._loadAllStats error: $e');
       if (mounted) {
         setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickCustomDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now.subtract(const Duration(days: 30)),
+      lastDate: now,
+      helpText: 'SELECT DATE TO VIEW PHONE USAGE',
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF00E5FF),
+              brightness: isDark ? Brightness.dark : Brightness.light,
+              primary: const Color(0xFF00E5FF),
+              onPrimary: const Color(0xFF030814),
+              surface: isDark ? const Color(0xFF071728) : Colors.white,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      HapticFeedback.selectionClick();
+      setState(() => _isLoading = true);
+
+      final startOfDay = DateTime(picked.year, picked.month, picked.day).millisecondsSinceEpoch;
+      final endOfDay = DateTime(picked.year, picked.month, picked.day, 23, 59, 59, 999).millisecondsSinceEpoch;
+
+      final res = await AppLimitService.getScreenTimeForCustomDate(startOfDay, endOfDay);
+      final rawApps = (res['apps'] as List?) ?? [];
+      final List<Map<String, dynamic>> customApps = [];
+      for (final a in rawApps) {
+        if (a is Map) {
+          final pkg = a['packageName'] as String? ?? '';
+          final name = a['appName'] as String? ?? pkg;
+          final cat = a['category'] as String? ?? 'Apps & Tools';
+          final duration = a['durationFormatted'] as String? ?? '0m';
+          final usageMins = (a['usageMinutes'] as num?)?.toInt() ?? 0;
+          final usageMs = (a['usageTimeMs'] as num?)?.toInt() ?? 0;
+          final visuals = _getAppVisuals(name, pkg, cat);
+
+          customApps.add({
+            'packageName': pkg,
+            'name': name,
+            'duration': duration,
+            'category': cat,
+            'usageMinutes': usageMins,
+            'usageTimeMs': usageMs,
+            'icon': visuals['icon'],
+            'gradient': visuals['gradient'],
+          });
+        }
+      }
+
+      final monthNames = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      final fullDate = '${picked.day} ${monthNames[picked.month - 1]} ${picked.year}';
+      final totalMs = (res['totalScreenTimeMs'] as num?)?.toInt() ?? 0;
+
+      if (mounted) {
+        setState(() {
+          _isCustomDateSelected = true;
+          _customDateRecord = {
+            'fullDate': fullDate,
+            'totalScreenTimeMs': totalMs,
+            'totalFormatted': AppLimitService.formatExactDuration(totalMs),
+            'apps': customApps,
+          };
           _isLoading = false;
         });
       }
@@ -262,6 +451,84 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
     return null;
   }
 
+  // Resolves the currently active list of apps based on day selection
+  List<Map<String, dynamic>> _getDisplayedScreenApps() {
+    if (_isCustomDateSelected && _customDateRecord != null) {
+      final apps = _customDateRecord!['apps'];
+      if (apps is List) return List<Map<String, dynamic>>.from(apps);
+      return [];
+    }
+    if (_selectedDayIndex == 6) {
+      return _screenTimeApps;
+    }
+    if (_selectedDayIndex >= 0 && _selectedDayIndex < _dailyHistory.length) {
+      final dayItem = _dailyHistory[_selectedDayIndex];
+      final apps = dayItem['apps'];
+      if (apps is List) {
+        final List<Map<String, dynamic>> list = [];
+        for (final a in apps) {
+          if (a is Map) {
+            final pkg = a['packageName'] as String? ?? '';
+            final name = a['appName'] as String? ?? pkg;
+            final cat = a['category'] as String? ?? 'Apps & Tools';
+            final duration = a['durationFormatted'] as String? ?? '0m';
+            final usageMins = (a['usageMinutes'] as num?)?.toInt() ?? 0;
+            final usageMs = (a['usageTimeMs'] as num?)?.toInt() ?? 0;
+            final visuals = _getAppVisuals(name, pkg, cat);
+
+            list.add({
+              'packageName': pkg,
+              'name': name,
+              'duration': duration,
+              'category': cat,
+              'usageMinutes': usageMins,
+              'usageTimeMs': usageMs,
+              'icon': visuals['icon'],
+              'gradient': visuals['gradient'],
+            });
+          }
+        }
+        return list;
+      }
+    }
+    return _screenTimeApps;
+  }
+
+  // Resolves currently displayed total screen time formatted string
+  String _getDisplayedTotalScreenTime() {
+    if (_selectedTab == 1) return _totalDataUsageFormatted;
+    if (_isCustomDateSelected && _customDateRecord != null) {
+      return _customDateRecord!['totalFormatted'] as String? ?? '0m';
+    }
+    if (_selectedDayIndex == 6) {
+      return _totalScreenTimeFormatted;
+    }
+    if (_selectedDayIndex >= 0 && _selectedDayIndex < _dailyHistory.length) {
+      final dayItem = _dailyHistory[_selectedDayIndex];
+      return dayItem['totalFormatted'] as String? ?? '0m';
+    }
+    return _totalScreenTimeFormatted;
+  }
+
+  // Resolves currently displayed day title
+  String _getDisplayedDayTitle() {
+    if (_selectedTab == 1) return "Today's Mobile & WiFi Data";
+    if (_isCustomDateSelected && _customDateRecord != null) {
+      return '${_customDateRecord!['fullDate']} Screen Time';
+    }
+    if (_selectedDayIndex == 6) {
+      return "Today's Live Screen Time";
+    }
+    if (_selectedDayIndex == 5) {
+      return "Yesterday's Screen Time";
+    }
+    if (_selectedDayIndex >= 0 && _selectedDayIndex < _dailyHistory.length) {
+      final dayItem = _dailyHistory[_selectedDayIndex];
+      return "${dayItem['fullDate'] ?? dayItem['dayName']} Screen Time";
+    }
+    return "Screen Time";
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -271,12 +538,8 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
 
-    final now = DateTime.now();
-    final monthNames = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    final todayDateStr = '${monthNames[now.month - 1]} ${now.day}, ${now.year}';
+    final displayedScreenApps = _getDisplayedScreenApps();
+    final isViewingToday = (_selectedDayIndex == 6 && !_isCustomDateSelected);
 
     return Scaffold(
       backgroundColor: kBgColor,
@@ -298,7 +561,12 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh_rounded, color: const Color(0xFF00E5FF), size: 22),
+            icon: const Icon(Icons.calendar_month_rounded, color: Color(0xFF00E5FF), size: 22),
+            tooltip: 'Pick date to view phone usage history',
+            onPressed: _pickCustomDate,
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded, color: Color(0xFF00E5FF), size: 22),
             tooltip: 'Refresh real-time stats',
             onPressed: () {
               HapticFeedback.lightImpact();
@@ -308,149 +576,44 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
         ],
         centerTitle: false,
       ),
-      body: SafeArea(
+      body: AmbientMeshBackground(
+        child: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadAllStats,
           color: const Color(0xFF00E5FF),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Permission Warning 1: Usage Access
                 if (!_hasUsagePermission) ...[
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFFF59E0B).withValues(alpha: 0.18),
-                          const Color(0xFFD97706).withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.5)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.security_update_warning_rounded, color: Color(0xFFF59E0B), size: 22),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'Usage Access Required (परमिशन आवश्यक)',
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : const Color(0xFF92400E),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'तुमच्या फोनचा रिअल-टाइम स्क्रीन टाइम आणि ॲप वापर अचूक मोजण्यासाठी Android ची "Usage Access" परमिशन द्या.',
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF78350F),
-                            fontSize: 12.5,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await AppLimitService.requestUsagePermission();
-                            },
-                            icon: const Icon(Icons.settings_suggest_rounded, size: 18),
-                            label: const Text('Grant Usage Permission (परमिशन द्या)', style: TextStyle(fontWeight: FontWeight.w700)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF59E0B),
-                              foregroundColor: const Color(0xFF030814),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _buildPermissionBanner(
+                    title: 'Usage Access Required (परमिशन आवश्यक)',
+                    description: 'तुमच्या फोनचा रिअल-टाइम स्क्रीन टाइम आणि ॲप वापर सेकंदा-सेकंदाला अचूक मोजण्यासाठी Android ची "Usage Access" परमिशन द्या.',
+                    buttonText: 'Grant Usage Permission (परमिशन द्या)',
+                    color: const Color(0xFFF59E0B),
+                    icon: Icons.security_update_warning_rounded,
+                    isDark: isDark,
+                    onTap: () async => await AppLimitService.requestUsagePermission(),
                   ),
                 ],
 
                 // Permission Warning 2: Accessibility Focus Blocker
                 if (_hasUsagePermission && !_hasAccessibilityPermission) ...[
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                          const Color(0xFF0284C7).withValues(alpha: 0.08),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.45)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(Icons.shield_rounded, color: Color(0xFF00E5FF), size: 22),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                'App Blocker Shield (ॲप लॉक सुरू करा)',
-                                style: TextStyle(
-                                  color: isDark ? Colors.white : const Color(0xFF075985),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 14.5,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'ॲपची लिमिट संपल्यानंतर ते फोनवर परत उघडू नये यासाठी HabbitNova Accessibility सर्विस चालू करा.',
-                          style: TextStyle(
-                            color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF0369A1),
-                            fontSize: 12.5,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await AppLimitService.requestAccessibilityPermission();
-                            },
-                            icon: const Icon(Icons.lock_person_rounded, size: 18),
-                            label: const Text('Turn ON Focus Shield (लॉक सुरू करा)', style: TextStyle(fontWeight: FontWeight.w700)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00E5FF),
-                              foregroundColor: const Color(0xFF030814),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  _buildPermissionBanner(
+                    title: 'App Blocker Shield (ॲप लॉक सुरू करा)',
+                    description: 'ॲपची लिमिट संपल्यानंतर ते फोनवर परत उघडू नये यासाठी HabbitNova Accessibility सर्विस चालू करा.',
+                    buttonText: 'Turn ON Focus Shield (लॉक सुरू करा)',
+                    color: const Color(0xFF00E5FF),
+                    icon: Icons.shield_rounded,
+                    isDark: isDark,
+                    onTap: () async => await AppLimitService.requestAccessibilityPermission(),
                   ),
                 ],
 
-                // Segmented Switcher: [📱 Screen] [🌐 Data]
+                // Segmented Switcher: [📱 Screen Time] [🌐 Data Usage]
                 Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -476,9 +639,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
 
-                // Hero Usage Summary Card (Real-time live values)
+                // Day Selection Pills Carousel (Today, Yesterday, Mon, Tue, etc.)
+                if (_selectedTab == 0) ...[
+                  _buildDaySelectorCarousel(isDark),
+                  const SizedBox(height: 16),
+                ],
+
+                // Hero Screen Time / Data Usage Card
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
@@ -531,43 +700,82 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                           children: [
                             Row(
                               children: [
-                                Text(
-                                  _selectedTab == 0 ? 'Today\'s Screen Time' : 'Daily Data Usage',
-                                  style: TextStyle(
-                                    color: kSubtextColor,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
+                                Flexible(
+                                  child: Text(
+                                    _getDisplayedDayTitle(),
+                                    style: TextStyle(
+                                      color: kSubtextColor,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Text(
-                                    'LIVE',
-                                    style: TextStyle(
-                                      color: Color(0xFF10B981),
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
+                                if (isViewingToday && _selectedTab == 0) ...[
+                                  FadeTransition(
+                                    opacity: _pulseAnimation,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.6)),
+                                      ),
+                                      child: const Text(
+                                        'LIVE USAGE',
+                                        style: TextStyle(
+                                          color: Color(0xFF10B981),
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.4,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                ),
+                                ] else if (_selectedTab == 0) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: const Text(
+                                      'RECORDED',
+                                      style: TextStyle(
+                                        color: Color(0xFF00E5FF),
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: 0.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              _selectedTab == 0 ? _totalScreenTimeFormatted : _totalDataUsageFormatted,
+                              _getDisplayedTotalScreenTime(),
                               style: TextStyle(
                                 color: kTextColor,
-                                fontSize: 22,
-                                fontWeight: FontWeight.w800,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
                                 letterSpacing: -0.5,
                               ),
                             ),
+                            if (_selectedTab == 0) ...[
+                              const SizedBox(height: 3),
+                              Text(
+                                isViewingToday
+                                    ? '⚡ Synced with Android Digital Wellbeing'
+                                    : '📊 Total phone usage recorded for this day',
+                                style: TextStyle(
+                                  color: isViewingToday ? const Color(0xFF10B981) : kSubtextColor,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -575,88 +783,106 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                   ),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 20),
 
-                // Weekly Bar Chart Container
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: kCardBg,
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: kBorderColor),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Weekly Screen Time Trend',
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w700,
+                // Weekly Bar Chart Container (Interactive: Tap any bar to inspect day!)
+                if (_selectedTab == 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: kCardBg,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: kBorderColor),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              '7-Day Phone Usage Trend',
+                              style: TextStyle(
+                                color: kTextColor,
+                                fontSize: 14.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          Text(
-                            '7 Days',
-                            style: TextStyle(
-                              color: const Color(0xFF00E5FF),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                            Text(
+                              'Tap any day 👆',
+                              style: TextStyle(
+                                color: const Color(0xFF00E5FF),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      _buildWeeklyBarChart(isDark),
-                    ],
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        _buildInteractiveWeeklyBarChart(isDark),
+                      ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
 
-                const SizedBox(height: 24),
-
-                // Section: Most Used Apps & App Limits
+                // Section: App breakdown
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _selectedTab == 0 ? 'Apps Screen Time' : 'Data Consumption by Apps',
-                          style: TextStyle(
-                            color: kTextColor,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        if (_selectedTab == 0)
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            'Tap any app to set daily limit & lock shield 🛑',
+                            _selectedTab == 0
+                                ? (isViewingToday
+                                    ? "Today's App Screen Time"
+                                    : "Apps on ${_getDisplayedDayTitle().replaceAll(' Screen Time', '')}")
+                                : 'Data Consumption by Apps',
                             style: TextStyle(
-                              color: kSubtextColor,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                              color: kTextColor,
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w700,
                             ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                      ],
-                    ),
-                    Text(
-                      todayDateStr,
-                      style: TextStyle(
-                        color: kSubtextColor,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
+                          if (_selectedTab == 0 && isViewingToday)
+                            Text(
+                              'Tap any app to set daily limit & lock shield 🛑',
+                              style: TextStyle(
+                                color: kSubtextColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            )
+                          else if (_selectedTab == 0)
+                            Text(
+                              'Exact breakdown of apps used on this date',
+                              style: TextStyle(
+                                color: kSubtextColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+                    if (_selectedTab == 0 && !_isCustomDateSelected && _selectedDayIndex < _dailyHistory.length)
+                      Text(
+                        _dailyHistory[_selectedDayIndex]['dateStr'] as String? ?? '',
+                        style: TextStyle(
+                          color: kSubtextColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
                   ],
                 ),
 
                 const SizedBox(height: 12),
 
-                // List of real apps
+                // List of apps
                 if (_isLoading) ...[
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 40),
@@ -664,75 +890,49 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                       child: CircularProgressIndicator(color: Color(0xFF00E5FF)),
                     ),
                   ),
-                ] else if (_selectedTab == 0 && _screenTimeApps.isEmpty) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: kCardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: kBorderColor),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.hourglass_empty_rounded, size: 40, color: Color(0xFF00E5FF)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No screen time recorded yet today',
-                          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w700, fontSize: 15),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Use your phone or grant Usage Access to track stats',
-                          style: TextStyle(color: kSubtextColor, fontSize: 12),
-                        ),
-                      ],
-                    ),
+                ] else if (_selectedTab == 0 && displayedScreenApps.isEmpty) ...[
+                  _buildEmptyStateCard(
+                    icon: Icons.hourglass_empty_rounded,
+                    title: 'No screen time recorded for this day',
+                    subtitle: isViewingToday
+                        ? 'Use your phone or grant Usage Access to track stats'
+                        : 'No active phone usage was recorded on this date',
+                    kCardBg: kCardBg,
+                    kBorderColor: kBorderColor,
+                    kTextColor: kTextColor,
+                    kSubtextColor: kSubtextColor,
                   ),
                 ] else if (_selectedTab == 1 && _dataApps.isEmpty) ...[
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: kCardBg,
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: kBorderColor),
-                    ),
-                    child: Column(
-                      children: [
-                        const Icon(Icons.wifi_off_rounded, size: 40, color: Color(0xFF00E5FF)),
-                        const SizedBox(height: 12),
-                        Text(
-                          'No network data recorded yet today',
-                          style: TextStyle(color: kTextColor, fontWeight: FontWeight.w700, fontSize: 15),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Connect to WiFi or Mobile Data to view per-app stats',
-                          style: TextStyle(color: kSubtextColor, fontSize: 12),
-                        ),
-                      ],
-                    ),
+                  _buildEmptyStateCard(
+                    icon: Icons.wifi_off_rounded,
+                    title: 'No network data recorded yet today',
+                    subtitle: 'Connect to WiFi or Mobile Data to view per-app stats',
+                    kCardBg: kCardBg,
+                    kBorderColor: kBorderColor,
+                    kTextColor: kTextColor,
+                    kSubtextColor: kSubtextColor,
                   ),
                 ] else ...[
                   ListView.separated(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: _selectedTab == 0 ? _screenTimeApps.length : _dataApps.length,
+                    itemCount: _selectedTab == 0 ? displayedScreenApps.length : _dataApps.length,
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (context, index) {
-                      final app = _selectedTab == 0 ? _screenTimeApps[index] : _dataApps[index];
+                      final app = _selectedTab == 0 ? displayedScreenApps[index] : _dataApps[index];
                       final List<Color> gradient = app['gradient'] as List<Color>;
                       final appName = app['name'] as String;
                       final pkg = app['packageName'] as String? ?? '';
                       final usageMinutes = (app['usageMinutes'] as int?) ?? 0;
+                      final usageMs = (app['usageTimeMs'] as int?) ?? 0;
                       final limitMinutes = _findLimitForApp(appName, pkg);
                       final isBlocked = _selectedTab == 0 &&
+                          isViewingToday &&
                           AppLimitService.isLimitReached(usageMinutes, limitMinutes);
 
                       return InkWell(
                         onTap: () {
-                          if (_selectedTab == 0) {
+                          if (_selectedTab == 0 && isViewingToday) {
                             if (isBlocked) {
                               _showAppBlockedShieldDialog(
                                 context: context,
@@ -765,7 +965,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                             border: Border.all(
                               color: isBlocked
                                   ? Colors.redAccent.withValues(alpha: 0.7)
-                                  : (limitMinutes != null
+                                  : (limitMinutes != null && isViewingToday
                                       ? const Color(0xFF00E5FF).withValues(alpha: 0.45)
                                       : kBorderColor),
                               width: isBlocked ? 1.5 : 1.0,
@@ -809,7 +1009,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                               ),
                               const SizedBox(width: 14),
 
-                              // App Details
+                              // App Details (Flexible & overflow-safe)
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -849,157 +1049,64 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                                         ],
                                       ],
                                     ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      _selectedTab == 0
-                                          ? (app['duration'] as String)
-                                          : (app['usage'] as String),
-                                      style: TextStyle(
-                                        color: kSubtextColor,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Trailing Action / Limit Badge
-                              if (_selectedTab == 0) ...[
-                                if (isBlocked && limitMinutes != null)
-                                  GestureDetector(
-                                    onTap: () => _showAppBlockedShieldDialog(
-                                      context: context,
-                                      appName: appName,
-                                      packageName: pkg,
-                                      usageMinutes: usageMinutes,
-                                      limitMinutes: limitMinutes,
-                                      gradient: gradient,
-                                      icon: app['icon'] as IconData,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.withValues(alpha: 0.18),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.7)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.lock_rounded, size: 13, color: Colors.redAccent),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Limit ${AppLimitService.formatMinutes(limitMinutes)} 🛑',
-                                            style: const TextStyle(
-                                              color: Colors.redAccent,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                else if (limitMinutes != null)
-                                  GestureDetector(
-                                    onTap: () => _showSetLimitSheet(
-                                      context: context,
-                                      appName: appName,
-                                      packageName: pkg,
-                                      usageMinutes: usageMinutes,
-                                      currentLimit: limitMinutes,
-                                      icon: app['icon'] as IconData,
-                                      gradient: gradient,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF00E5FF).withValues(alpha: 0.14),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.4)),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(Icons.hourglass_bottom_rounded, size: 13, color: Color(0xFF00E5FF)),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Limit: ${AppLimitService.formatMinutes(limitMinutes)}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF00E5FF),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  )
-                                else
-                                  GestureDetector(
-                                    onTap: () => _showSetLimitSheet(
-                                      context: context,
-                                      appName: appName,
-                                      packageName: pkg,
-                                      usageMinutes: usageMinutes,
-                                      currentLimit: null,
-                                      icon: app['icon'] as IconData,
-                                      gradient: gradient,
-                                    ),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9),
-                                        borderRadius: BorderRadius.circular(10),
-                                        border: Border.all(color: kBorderColor),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.add_alarm_rounded, size: 13, color: kSubtextColor),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            'Set Limit',
+                                    const SizedBox(height: 3),
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            app['category'] as String,
                                             style: TextStyle(
                                               color: kSubtextColor,
+                                              fontSize: 11.5,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (_selectedTab == 0 && limitMinutes != null && isViewingToday) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            '• Limit: ${AppLimitService.formatMinutes(limitMinutes)}',
+                                            style: TextStyle(
+                                              color: isBlocked ? Colors.redAccent : const Color(0xFF00E5FF),
                                               fontSize: 11,
                                               fontWeight: FontWeight.w600,
                                             ),
                                           ),
                                         ],
-                                      ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+
+                              // Usage time / Data consumption
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    _selectedTab == 0
+                                        ? (app['duration'] as String)
+                                        : (app['usage'] as String),
+                                    style: TextStyle(
+                                      color: isBlocked ? Colors.redAccent : kTextColor,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
                                     ),
                                   ),
-                              ] else ...[
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9),
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: kBorderColor),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.data_usage_rounded,
-                                        size: 13,
-                                        color: Color(0xFF00E5FF),
+                                  if (_selectedTab == 0 && usageMs > 0 && _liveTodayScreenTimeMs > 0 && isViewingToday) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '${((usageMs / _liveTodayScreenTimeMs) * 100).clamp(1, 100).toInt()}% of phone',
+                                      style: TextStyle(
+                                        color: const Color(0xFF00E5FF),
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w600,
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        app['usage'] as String? ?? '0 MB',
-                                        style: TextStyle(
-                                          color: kTextColor,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ],
                           ),
                         ),
@@ -1007,141 +1114,428 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                     },
                   ),
                 ],
-
                 const SizedBox(height: 24),
               ],
             ),
           ),
         ),
       ),
+    ),
+  );
+  }
+
+  // Horizontally scrollable day selector carousel with haptic feedback
+  Widget _buildDaySelectorCarousel(bool isDark) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: [
+          // 7 days pills (6 days ago to Today)
+          ...List.generate(_dailyHistory.length, (i) {
+            final dayData = _dailyHistory[i];
+            final isToday = (i == 6);
+            final isSelected = (!_isCustomDateSelected && _selectedDayIndex == i);
+            final dayName = isToday ? 'Today' : (i == 5 ? 'Yesterday' : (dayData['dayName'] as String? ?? 'Day'));
+            final formatted = dayData['totalFormatted'] as String? ?? '0m';
+
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _isCustomDateSelected = false;
+                    _selectedDayIndex = i;
+                  });
+                },
+                borderRadius: BorderRadius.circular(14),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF00E5FF).withValues(alpha: isDark ? 0.22 : 0.15)
+                        : (isDark ? const Color(0xFF071728) : Colors.white),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF00E5FF) : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                              color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isToday) ...[
+                            Container(
+                              width: 6,
+                              height: 6,
+                              margin: const EdgeInsets.only(right: 5),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF10B981),
+                              ),
+                            ),
+                          ],
+                          Text(
+                            dayName,
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF00E5FF)
+                                  : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
+                              fontSize: 12.5,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        isToday ? _totalScreenTimeFormatted : formatted,
+                        style: TextStyle(
+                          color: isSelected
+                              ? (isDark ? Colors.white : const Color(0xFF00E5FF))
+                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+
+          // Custom Date Picker chip
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: InkWell(
+              onTap: _pickCustomDate,
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _isCustomDateSelected
+                      ? const Color(0xFF00E5FF).withValues(alpha: isDark ? 0.22 : 0.15)
+                      : (isDark ? const Color(0xFF071728) : Colors.white),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: _isCustomDateSelected ? const Color(0xFF00E5FF) : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
+                    width: _isCustomDateSelected ? 1.5 : 1.0,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.calendar_today_rounded, size: 14, color: Color(0xFF00E5FF)),
+                    const SizedBox(width: 6),
+                    Text(
+                      _isCustomDateSelected && _customDateRecord != null
+                          ? (_customDateRecord!['fullDate'] as String? ?? 'Picked')
+                          : 'Custom Date',
+                      style: TextStyle(
+                        color: _isCustomDateSelected
+                            ? const Color(0xFF00E5FF)
+                            : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildWeeklyBarChart(bool isDark) {
+  // Interactive 7-day bar chart with LayoutBuilder and zero-overflow flexible columns
+  Widget _buildInteractiveWeeklyBarChart(bool isDark) {
     double maxH = 1.0;
     for (final h in _weeklyHours) {
       if (h > maxH) maxH = h;
     }
     final topCeil = (maxH < 4.0) ? 4.0 : (maxH.ceilToDouble());
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 180,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _buildGridLine('${topCeil.toInt()}h', isDark),
-                    _buildGridLine('${(topCeil * 0.75).toStringAsFixed(1)}h', isDark),
-                    _buildGridLine('${(topCeil * 0.5).toStringAsFixed(1)}h', isDark),
-                    _buildGridLine('${(topCeil * 0.25).toStringAsFixed(1)}h', isDark),
-                    _buildGridLine('0h', isDark),
-                  ],
-                ),
-              ),
-              Positioned(
-                left: 36,
-                right: 0,
-                top: 4,
-                bottom: 6,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: List.generate(_weeklyHours.length, (i) {
-                    final h = _weeklyHours[i];
-                    final isToday = i == (_weeklyHours.length - 1);
-                    final heightRatio = (h / topCeil).clamp(0.06, 1.0);
-
-                    return Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Column(
+          children: [
+            SizedBox(
+              height: 175,
+              child: Stack(
+                children: [
+                  // Horizontal Grid Lines
+                  Positioned.fill(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        if (h > 0)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 4),
-                            child: Text(
-                              '${h}h',
-                              style: TextStyle(
-                                fontSize: 9.5,
-                                fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
-                                color: isToday ? const Color(0xFF00E5FF) : const Color(0xFF64748B),
-                              ),
+                        _buildGridLine('${topCeil.toInt()}h', isDark),
+                        _buildGridLine('${(topCeil * 0.75).toStringAsFixed(1)}h', isDark),
+                        _buildGridLine('${(topCeil * 0.5).toStringAsFixed(1)}h', isDark),
+                        _buildGridLine('${(topCeil * 0.25).toStringAsFixed(1)}h', isDark),
+                        _buildGridLine('0h', isDark),
+                      ],
+                    ),
+                  ),
+
+                  // Interactive Bars Row
+                  Positioned(
+                    left: 36,
+                    right: 4,
+                    top: 4,
+                    bottom: 6,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: List.generate(_weeklyHours.length, (i) {
+                        final h = _weeklyHours[i];
+                        final isSelected = (!_isCustomDateSelected && _selectedDayIndex == i);
+                        final heightRatio = (h / topCeil).clamp(0.06, 1.0);
+
+                        return Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              setState(() {
+                                _isCustomDateSelected = false;
+                                _selectedDayIndex = i;
+                              });
+                            },
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                if (h > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 4),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Text(
+                                        '${h}h',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                                          color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF64748B),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                Container(
+                                  width: 24,
+                                  height: 120 * heightRatio,
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    gradient: isSelected
+                                        ? const LinearGradient(
+                                            colors: [
+                                              Color(0xFF00E5FF),
+                                              Color(0xFF0284C7),
+                                            ],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          )
+                                        : LinearGradient(
+                                            colors: isDark
+                                                ? [
+                                                    const Color(0xFF1E293B),
+                                                    const Color(0xFF0F172A),
+                                                  ]
+                                                : [
+                                                    const Color(0xFFE2E8F0),
+                                                    const Color(0xFFCBD5E1),
+                                                  ],
+                                            begin: Alignment.topCenter,
+                                            end: Alignment.bottomCenter,
+                                          ),
+                                    boxShadow: isSelected
+                                        ? [
+                                            BoxShadow(
+                                              color: const Color(0xFF00E5FF).withValues(alpha: 0.4),
+                                              blurRadius: 10,
+                                              offset: const Offset(0, 3),
+                                            ),
+                                          ]
+                                        : null,
+                                    border: isSelected
+                                        ? Border.all(color: Colors.white.withValues(alpha: 0.8), width: 1.2)
+                                        : null,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        Container(
-                          width: 26,
-                          height: 130 * heightRatio,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(14),
-                            gradient: isToday
-                                ? const LinearGradient(
-                                    colors: [
-                                      Color(0xFF00E5FF),
-                                      Color(0xFF0284C7),
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  )
-                                : LinearGradient(
-                                    colors: isDark
-                                        ? [
-                                            const Color(0xFF1E293B),
-                                            const Color(0xFF0F172A),
-                                          ]
-                                        : [
-                                            const Color(0xFFE2E8F0),
-                                            const Color(0xFFCBD5E1),
-                                          ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
-                            boxShadow: isToday
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(0xFF00E5FF).withValues(alpha: 0.35),
-                                      blurRadius: 10,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
-                                : null,
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Weekday labels (Overflow-safe Expanded)
+            Padding(
+              padding: const EdgeInsets.only(left: 36, right: 4),
+              child: Row(
+                children: List.generate(_weekDays.length, (i) {
+                  final isSelected = (!_isCustomDateSelected && _selectedDayIndex == i);
+                  final isToday = (i == _weekDays.length - 1);
+
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _isCustomDateSelected = false;
+                          _selectedDayIndex = i;
+                        });
+                      },
+                      child: Center(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            isToday ? 'Today' : _weekDays[i],
+                            style: TextStyle(
+                              color: isSelected
+                                  ? const Color(0xFF00E5FF)
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                              fontSize: 10.5,
+                              fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
+                            ),
                           ),
                         ),
-                      ],
-                    );
-                  }),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildEmptyStateCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color kCardBg,
+    required Color kBorderColor,
+    required Color kTextColor,
+    required Color kSubtextColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: kCardBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: kBorderColor),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 40, color: const Color(0xFF00E5FF)),
+          const SizedBox(height: 12),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: kTextColor, fontWeight: FontWeight.w700, fontSize: 14.5),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: kSubtextColor, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionBanner({
+    required String title,
+    required String description,
+    required String buttonText,
+    required Color color,
+    required IconData icon,
+    required bool isDark,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            color.withValues(alpha: 0.18),
+            color.withValues(alpha: 0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isDark ? Colors.white : color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14.5,
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-        const SizedBox(height: 10),
-        Padding(
-          padding: const EdgeInsets.only(left: 36),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_weekDays.length, (i) {
-              final isToday = i == (_weekDays.length - 1);
-              return SizedBox(
-                width: 28,
-                child: Center(
-                  child: Text(
-                    _weekDays[i],
-                    style: TextStyle(
-                      color: isToday
-                          ? const Color(0xFF00E5FF)
-                          : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
-                      fontSize: 11,
-                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
-                    ),
-                  ),
-                ),
-              );
-            }),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: TextStyle(
+              color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
+              fontSize: 12.5,
+              height: 1.35,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: onTap,
+              icon: const Icon(Icons.settings_suggest_rounded, size: 18),
+              label: Text(buttonText, style: const TextStyle(fontWeight: FontWeight.w700)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: color,
+                foregroundColor: const Color(0xFF030814),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1181,106 +1575,109 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                 ),
               ],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFEF4444), Color(0xFF991B1B)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.redAccent.withValues(alpha: 0.4),
-                        blurRadius: 18,
-                        offset: const Offset(0, 4),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFEF4444), Color(0xFF991B1B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.lock_rounded,
-                    color: Colors.white,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  '$appName is Blocked! 🛑',
-                  style: TextStyle(
-                    color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Daily Limit Reached: ${AppLimitService.formatMinutes(limitMinutes)}',
-                  style: const TextStyle(
-                    color: Colors.redAccent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'तुम्ही आज $appName चा वापर ${AppLimitService.formatMinutes(usageMinutes)} केला आहे. Focus Shield ने हे ॲप आजसाठी लॉक केले आहे जेणेकरून तुमचे ध्येय पूर्ण होईल.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                    fontSize: 13,
-                    height: 1.4,
-                  ),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(ctx).pop();
-                      _showSetLimitSheet(
-                        context: context,
-                        appName: appName,
-                        packageName: packageName,
-                        usageMinutes: usageMinutes,
-                        currentLimit: limitMinutes,
-                        icon: icon,
-                        gradient: gradient,
-                      );
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00E5FF),
-                      foregroundColor: const Color(0xFF030814),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.redAccent.withValues(alpha: 0.4),
+                          blurRadius: 18,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                    child: const Text(
-                      'Adjust / Remove Limit',
-                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                    child: const Icon(
+                      Icons.lock_rounded,
+                      color: Colors.white,
+                      size: 36,
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(
-                    'Stay Focused (बंद करा)',
+                  const SizedBox(height: 18),
+                  Text(
+                    '$appName is Blocked! 🛑',
+                    style: TextStyle(
+                      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Daily Limit Reached: ${AppLimitService.formatMinutes(limitMinutes)}',
+                    style: const TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'तुम्ही आज $appName चा वापर ${AppLimitService.formatMinutes(usageMinutes)} केला आहे. Focus Shield ने हे ॲप आजसाठी लॉक केले आहे जेणेकरून तुमचे ध्येय पूर्ण होईल.',
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       fontSize: 13,
-                      fontWeight: FontWeight.w600,
+                      height: 1.4,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        _showSetLimitSheet(
+                          context: context,
+                          appName: appName,
+                          packageName: packageName,
+                          usageMinutes: usageMinutes,
+                          currentLimit: limitMinutes,
+                          icon: icon,
+                          gradient: gradient,
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00E5FF),
+                        foregroundColor: const Color(0xFF030814),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Adjust / Remove Limit',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: Text(
+                      'Stay Focused (बंद करा)',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -1311,7 +1708,15 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
             final isCurrentlyBlocked = AppLimitService.isLimitReached(usageMinutes, selectedMinutes);
 
             return Container(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(bCtx).size.height * 0.88,
+              ),
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 20,
+                bottom: MediaQuery.of(bCtx).viewInsets.bottom + 28,
+              ),
               decoration: BoxDecoration(
                 color: isDark ? const Color(0xFF071728) : Colors.white,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
@@ -1324,222 +1729,228 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF475569),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: gradient,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF475569),
+                            borderRadius: BorderRadius.circular(4),
                           ),
-                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Icon(icon, color: Colors.white, size: 24),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              appName,
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: gradient,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(icon, color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  appName,
+                                  style: TextStyle(
+                                    color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                Text(
+                                  'Screen time today: ${AppLimitService.formatMinutes(usageMinutes)}',
+                                  style: TextStyle(
+                                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                    fontSize: 12.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Select Daily Usage Limit:',
+                        style: TextStyle(
+                          color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [15, 30, 45, 60, 90, 120, 180].map((mins) {
+                          final isSelected = selectedMinutes == mins;
+                          final willBlock = usageMinutes >= mins;
+
+                          return ChoiceChip(
+                            label: Text(
+                              AppLimitService.formatMinutes(mins),
                               style: TextStyle(
-                                color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
-                                fontSize: 18,
-                                fontWeight: FontWeight.w800,
+                                color: isSelected
+                                    ? const Color(0xFF030814)
+                                    : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
+                                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                                fontSize: 13,
                               ),
                             ),
-                            Text(
-                              'Screen time today: ${AppLimitService.formatMinutes(usageMinutes)}',
-                              style: TextStyle(
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                fontSize: 12.5,
+                            selected: isSelected,
+                            selectedColor: willBlock ? Colors.redAccent : const Color(0xFF00E5FF),
+                            backgroundColor: isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? (willBlock ? Colors.redAccent : const Color(0xFF00E5FF))
+                                  : const Color(0xFF0E3D48),
+                            ),
+                            onSelected: (val) {
+                              if (val) {
+                                HapticFeedback.selectionClick();
+                                setModalState(() => selectedMinutes = mins);
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: isCurrentlyBlocked
+                              ? Colors.red.withValues(alpha: 0.12)
+                              : const Color(0xFF00E5FF).withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isCurrentlyBlocked
+                                ? Colors.redAccent.withValues(alpha: 0.4)
+                                : const Color(0xFF00E5FF).withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isCurrentlyBlocked ? Icons.lock_rounded : Icons.shield_rounded,
+                              color: isCurrentlyBlocked ? Colors.redAccent : const Color(0xFF00E5FF),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                isCurrentlyBlocked
+                                    ? 'Status: LIMIT REACHED. $appName will be blocked immediately.'
+                                    : 'Status: ACTIVE. $appName will lock once ${AppLimitService.formatMinutes(selectedMinutes)} is reached.',
+                                style: TextStyle(
+                                  color: isCurrentlyBlocked
+                                      ? Colors.redAccent
+                                      : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Select Daily Usage Limit:',
-                    style: TextStyle(
-                      color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [15, 30, 45, 60, 90, 120, 180].map((mins) {
-                      final isSelected = selectedMinutes == mins;
-                      final willBlock = usageMinutes >= mins;
-
-                      return ChoiceChip(
-                        label: Text(
-                          AppLimitService.formatMinutes(mins),
-                          style: TextStyle(
-                            color: isSelected
-                                ? const Color(0xFF030814)
-                                : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                        selected: isSelected,
-                        selectedColor: willBlock ? Colors.redAccent : const Color(0xFF00E5FF),
-                        backgroundColor: isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9),
-                        side: BorderSide(
-                          color: isSelected
-                              ? (willBlock ? Colors.redAccent : const Color(0xFF00E5FF))
-                              : const Color(0xFF0E3D48),
-                        ),
-                        onSelected: (val) {
-                          if (val) {
-                            HapticFeedback.selectionClick();
-                            setModalState(() => selectedMinutes = mins);
-                          }
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 18),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: isCurrentlyBlocked
-                          ? Colors.red.withValues(alpha: 0.12)
-                          : const Color(0xFF00E5FF).withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: isCurrentlyBlocked
-                            ? Colors.redAccent.withValues(alpha: 0.4)
-                            : const Color(0xFF00E5FF).withValues(alpha: 0.25),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isCurrentlyBlocked ? Icons.lock_rounded : Icons.shield_rounded,
-                          color: isCurrentlyBlocked ? Colors.redAccent : const Color(0xFF00E5FF),
-                          size: 20,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            isCurrentlyBlocked
-                                ? 'Status: LIMIT REACHED. $appName will be blocked immediately.'
-                                : 'Status: ACTIVE. $appName will lock once ${AppLimitService.formatMinutes(selectedMinutes)} is reached.',
-                            style: TextStyle(
-                              color: isCurrentlyBlocked
-                                  ? Colors.redAccent
-                                  : (isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A)),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  Row(
-                    children: [
-                      if (currentLimit != null) ...[
-                        Expanded(
-                          flex: 1,
-                          child: OutlinedButton(
-                            onPressed: () async {
-                              final navigator = Navigator.of(bCtx);
-                              final messenger = ScaffoldMessenger.of(context);
-                              HapticFeedback.mediumImpact();
-                              await AppLimitService.removeLimit(appName, packageName: packageName);
-                              await _loadAllStats();
-                              navigator.pop();
-                              messenger.showSnackBar(
-                                SnackBar(
-                                  content: Text('Removed limit for $appName'),
-                                  backgroundColor: const Color(0xFF071728),
+                      const SizedBox(height: 22),
+                      Row(
+                        children: [
+                          if (currentLimit != null) ...[
+                            Expanded(
+                              flex: 1,
+                              child: OutlinedButton(
+                                onPressed: () async {
+                                  final navigator = Navigator.of(bCtx);
+                                  final messenger = ScaffoldMessenger.of(context);
+                                  HapticFeedback.mediumImpact();
+                                  await AppLimitService.removeLimit(appName, packageName: packageName);
+                                  await _loadAllStats();
+                                  navigator.pop();
+                                  messenger.showSnackBar(
+                                    SnackBar(
+                                      content: Text('Removed limit for $appName'),
+                                      backgroundColor: const Color(0xFF071728),
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: const BorderSide(color: Colors.redAccent),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
                                 ),
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Colors.redAccent),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                                child: const Text(
+                                  'Remove',
+                                  style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700),
+                                ),
                               ),
                             ),
-                            child: const Text(
-                              'Remove',
-                              style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                      ],
-                      Expanded(
-                        flex: 2,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final navigator = Navigator.of(bCtx);
-                            final messenger = ScaffoldMessenger.of(context);
-                            HapticFeedback.mediumImpact();
-                            await AppLimitService.setLimit(
-                              appName,
-                              selectedMinutes,
-                              packageName: packageName,
-                            );
-                            await _loadAllStats();
-                            navigator.pop();
-                            messenger.showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  'Daily limit for $appName set to ${AppLimitService.formatMinutes(selectedMinutes)} ✨ (Blocked when reached)',
+                            const SizedBox(width: 12),
+                          ],
+                          Expanded(
+                            flex: 2,
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final navigator = Navigator.of(bCtx);
+                                final messenger = ScaffoldMessenger.of(context);
+                                HapticFeedback.mediumImpact();
+                                await AppLimitService.setLimit(
+                                  appName,
+                                  selectedMinutes,
+                                  packageName: packageName,
+                                );
+                                await _loadAllStats();
+                                navigator.pop();
+                                messenger.showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Daily limit for $appName set to ${AppLimitService.formatMinutes(selectedMinutes)} ✨ (Blocked when reached)',
+                                    ),
+                                    backgroundColor: const Color(0xFF0E223D),
+                                  ),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF00E5FF),
+                                foregroundColor: const Color(0xFF030814),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
-                                backgroundColor: const Color(0xFF0E223D),
+                                elevation: 0,
                               ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00E5FF),
-                            foregroundColor: const Color(0xFF030814),
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
+                              child: Text(
+                                'Save Limit (${AppLimitService.formatMinutes(selectedMinutes)})',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                              ),
                             ),
-                            elevation: 0,
                           ),
-                          child: Text(
-                            'Save Limit (${AppLimitService.formatMinutes(selectedMinutes)})',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
-                          ),
-                        ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
             );
           },
@@ -1559,6 +1970,7 @@ class _StatisticsScreenState extends State<StatisticsScreen> with WidgetsBinding
     return Expanded(
       child: GestureDetector(
         onTap: () {
+          HapticFeedback.selectionClick();
           setState(() {
             _selectedTab = index;
           });

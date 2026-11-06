@@ -7,10 +7,14 @@ import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
+import 'dart:ui';
+import 'package:synvero/core/widgets/spring_pressable.dart';
+import 'package:synvero/core/widgets/ambient_mesh_background.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
+import 'package:synvero/core/services/squad_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/features/dashboard/presentation/ai_coach_card.dart';
@@ -256,6 +260,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         });
       }
       AppWidgetService.syncWidget();
+      SquadService.syncMyLiveProgressToAllSquads();
     }
   }
 
@@ -280,6 +285,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('user_${currentUserId}_streak_days', _streakDays);
       AppWidgetService.syncWidget();
+      SquadService.syncMyLiveProgressToAllSquads();
     } catch (_) {}
 
     if (mounted) {
@@ -326,7 +332,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
-    final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
     final kProgressRingBg = isDark ? const Color(0xFF0A1F30) : const Color(0xFFF1F5F9);
 
     final streakBadge = StreakBadgeService.getBadge(_streakDays);
@@ -354,7 +359,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       },
       child: Scaffold(
       backgroundColor: kBgColor,
-      body: SafeArea(
+      body: AmbientMeshBackground(
+        child: SafeArea(
         child: _isLoading
             ? const Center(
                 child: CircularProgressIndicator(color: kPrimaryColor),
@@ -408,12 +414,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     children: [
                                       Text(streakBadge.emoji, style: const TextStyle(fontSize: 12)),
                                       const SizedBox(width: 5),
-                                      Text(
-                                        '${streakBadge.title} • ${_streakDays}d Streak',
-                                        style: TextStyle(
-                                          color: streakBadge.color,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                      Flexible(
+                                        child: Text(
+                                          '${streakBadge.title} • ${_streakDays}d Streak',
+                                          style: TextStyle(
+                                            color: streakBadge.color,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
@@ -437,12 +446,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                       children: [
                                         Text(GamificationService.getLevelInfo(_totalXP).badgeEmoji, style: const TextStyle(fontSize: 12)),
                                         const SizedBox(width: 5),
-                                        Text(
-                                          'Lvl ${GamificationService.getLevelInfo(_totalXP).level} • ${GamificationService.getLevelInfo(_totalXP).title} ($_totalXP XP) 🏆',
-                                          style: const TextStyle(
-                                            color: Color(0xFF00F0FF),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
+                                        Flexible(
+                                          child: Text(
+                                            'Lvl ${GamificationService.getLevelInfo(_totalXP).level} • ${GamificationService.getLevelInfo(_totalXP).title} ($_totalXP XP) 🏆',
+                                            style: const TextStyle(
+                                              color: Color(0xFF00F0FF),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
                                           ),
                                         ),
                                       ],
@@ -1174,9 +1186,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 10),
-                          child: InkWell(
+                          child: SpringPressable(
                             onTap: () => _toggleDashboardHabit(habitId, habitName),
-                            borderRadius: BorderRadius.circular(16),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                               decoration: BoxDecoration(
@@ -1401,63 +1412,94 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 ),
               ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: kBottomNavBg,
-          border: Border(
-            top: BorderSide(color: kBorderColor, width: 1),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF071728).withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.22) : const Color(0xFFE2E8F0),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: _currentTabIndex,
+                  elevation: 0,
+                  onTap: (index) {
+                    setState(() {
+                      _currentTabIndex = index;
+                    });
+                    if (index == 1) {
+                      Navigator.of(context).pushNamed('/habits').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                        _loadProfile();
+                      });
+                    } else if (index == 2) {
+                      Navigator.of(context).pushNamed('/timer').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    } else if (index == 3) {
+                      Navigator.of(context).pushNamed('/tasks').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    } else if (index == 4) {
+                      Navigator.of(context).pushNamed('/profile').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    }
+                  },
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  selectedItemColor: isDark ? const Color(0xFF00F0FF) : kPrimaryColor,
+                  unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  selectedLabelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  unselectedLabelStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  items: const [
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.home_rounded),
+                      label: 'Home',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.calendar_today_rounded),
+                      label: 'Habits',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.timer_outlined),
+                      label: 'Timer',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.checklist_rounded),
+                      label: 'Tasks',
+                    ),
+                    BottomNavigationBarItem(
+                      icon: Icon(Icons.person_outline_rounded),
+                      label: 'Profile',
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (index) {
-            setState(() {
-              _currentTabIndex = index;
-            });
-            if (index == 1) {
-              Navigator.of(context).pushNamed('/habits').then((_) => _loadProfile());
-            } else if (index == 2) {
-              Navigator.of(context).pushNamed('/timer');
-            } else if (index == 3) {
-              Navigator.of(context).pushNamed('/tasks');
-            } else if (index == 4) {
-              Navigator.of(context).pushNamed('/profile');
-            }
-          },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: kBottomNavBg,
-          selectedItemColor: kPrimaryColor,
-          unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-          selectedLabelStyle: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w400,
-          ),
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.calendar_today_rounded),
-              label: 'Habits',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.timer_outlined),
-              label: 'Timer',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.checklist_rounded),
-              label: 'Tasks',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              label: 'Profile',
-            ),
-          ],
         ),
       ),
     ),
@@ -1663,31 +1705,29 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     required VoidCallback onTap,
     String? imageAsset,
   }) {
-    return InkWell(
+    return SpringPressable(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
       child: Column(
         children: [
           Container(
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF071728) : bgColor,
+              color: isDark ? const Color(0xFF071728).withValues(alpha: 0.85) : bgColor,
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
                 color: imageAsset != null
-                    ? const Color(0xFF00F0FF).withValues(alpha: 0.5)
-                    : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0)),
+                    ? const Color(0xFF00F0FF).withValues(alpha: 0.6)
+                    : (isDark ? color.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
+                width: 1.2,
               ),
-              boxShadow: imageAsset != null
-                  ? [
-                      BoxShadow(
-                        color: const Color(0xFF00F0FF).withValues(alpha: 0.2),
-                        blurRadius: 10,
-                        offset: const Offset(0, 3),
-                      ),
-                    ]
-                  : null,
+              boxShadow: [
+                BoxShadow(
+                  color: (imageAsset != null ? const Color(0xFF00F0FF) : color).withValues(alpha: isDark ? 0.22 : 0.08),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: imageAsset != null
                 ? ClipRRect(

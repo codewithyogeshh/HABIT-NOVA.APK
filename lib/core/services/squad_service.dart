@@ -4,7 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:synvero/core/services/app_limit_service.dart';
+import 'package:synvero/core/services/focus_timer_service.dart';
 import 'package:synvero/core/services/gamification_service.dart';
+import 'package:synvero/core/services/habit_daily_service.dart';
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
@@ -21,6 +24,7 @@ class SquadMember {
   final bool isLeader;
   final bool isMVP;
   final bool isSlacker;
+  final DateTime? lastActiveAt;
 
   const SquadMember({
     required this.id,
@@ -34,6 +38,7 @@ class SquadMember {
     this.isLeader = false,
     this.isMVP = false,
     this.isSlacker = false,
+    this.lastActiveAt,
   });
 
   SquadMember copyWith({
@@ -48,6 +53,7 @@ class SquadMember {
     bool? isLeader,
     bool? isMVP,
     bool? isSlacker,
+    DateTime? lastActiveAt,
   }) {
     return SquadMember(
       id: id ?? this.id,
@@ -61,6 +67,7 @@ class SquadMember {
       isLeader: isLeader ?? this.isLeader,
       isMVP: isMVP ?? this.isMVP,
       isSlacker: isSlacker ?? this.isSlacker,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
   }
 
@@ -76,6 +83,7 @@ class SquadMember {
         'isLeader': isLeader,
         'isMVP': isMVP,
         'isSlacker': isSlacker,
+        'lastActiveAt': lastActiveAt?.toIso8601String(),
       };
 
   factory SquadMember.fromJson(Map<String, dynamic> json) => SquadMember(
@@ -90,6 +98,9 @@ class SquadMember {
         isLeader: json['isLeader'] as bool? ?? false,
         isMVP: json['isMVP'] as bool? ?? false,
         isSlacker: json['isSlacker'] as bool? ?? false,
+        lastActiveAt: json['lastActiveAt'] != null
+            ? DateTime.tryParse(json['lastActiveAt'] as String)
+            : null,
       );
 }
 
@@ -155,7 +166,7 @@ class SquadService {
       'https://firestore.googleapis.com/v1/projects/taskflow-c57d8/databases/(default)/documents/community_leaderboard';
   static const String _firestoreApiKey = 'AIzaSyBMPwBRrvllX1AOEAwczp0Xo6fGwg7hr6c';
 
-  /// Generates a clean 6-character squad code (e.g. "NOVA84" or "MPSC26")
+  /// Generates a clean 6-character squad code (e.g. "NOVA84" or "STUD26")
   static String generateSquadCode([String prefix = 'NOVA']) {
     final random = Random();
     final cleanPrefix = prefix.replaceAll(RegExp(r'[^A-Z]'), '');
@@ -198,7 +209,11 @@ class SquadService {
     }).toList();
   }
 
-  /// Resolves the current logged in user's live profile & stats.
+  /// Resolves the current logged in user's live profile & real-time stats across:
+  /// 1. Real Screen Time (Android UsageStatsManager via AppLimitService)
+  /// 2. Real Study Time (FocusTimer completed sessions & minutes)
+  /// 3. Real Completed Habits today (HabitDailyService)
+  /// 4. Real Streaks & XP
   static Future<SquadMember> _resolveCurrentUserMember({bool isLeader = false}) async {
     final prefs = await SharedPreferences.getInstance();
     final sbUser = SupabaseService.user;
@@ -212,30 +227,53 @@ class SquadService {
         (sbUser?.email != null ? sbUser!.email!.split('@').first : 'User');
 
     final avatar = prefs.getString('user_avatar') ?? 'assets/images/avatar_m1.png';
-    final streak = prefs.getInt('app_streak_days') ??
-        prefs.getInt('user_${sbUser?.id ?? "guest"}_streak_days') ??
-        1;
+
+    // 1. Calculate real completed habits count today with HabitDailyService
+    int completedHabits = 0;
+    final defaultHabitIds = ['def-1', 'def-2', 'def-3', 'def-4', 'def-5'];
+    for (final hid in defaultHabitIds) {
+      final isDone = await HabitDailyService.isHabitCompletedToday(currentUserId, hid);
+      if (isDone) completedHabits++;
+    }
+
+    // 2. Calculate real streak
+    final savedStreak = prefs.getInt('user_${currentUserId}_streak_days') ??
+        prefs.getInt('app_streak_days') ??
+        prefs.getInt('user_${sbUser?.id ?? "guest"}_streak_days');
+    final streak = (savedStreak != null && savedStreak > 0)
+        ? savedStreak
+        : (completedHabits > 0 ? 1 : 0);
+
+    // 3. Calculate real focus study time today
+    final sessionCount = prefs.getInt('user_${currentUserId}_timer_completed_sessions') ??
+        FocusTimerService.instance.completedSessionsNotifier.value;
+    final focusMins = prefs.getInt('user_${currentUserId}_focus_duration_mins') ?? 25;
+    int studyMinutes = sessionCount * focusMins;
+    final manualStudy = prefs.getInt('today_study_minutes') ?? prefs.getInt('focus_timer_minutes_today') ?? 0;
+    if (manualStudy > studyMinutes) {
+      studyMinutes = manualStudy;
+    }
+
+    // 4. Calculate real screen time minutes today from native Android UsageStats
+    int screenTimeMinutes = 0;
+    try {
+      final screenStats = await AppLimitService.getLiveScreenTimeStats();
+      final ms = (screenStats['totalScreenTimeMs'] as num?)?.toInt() ?? 0;
+      if (ms > 0) {
+        screenTimeMinutes = ms ~/ 60000;
+      }
+    } catch (_) {}
+    if (screenTimeMinutes == 0) {
+      screenTimeMinutes = prefs.getInt('today_screen_time_minutes') ?? 0;
+    }
+
+    // Cache computed live metrics locally
+    await prefs.setInt('today_screen_time_minutes', screenTimeMinutes);
+    await prefs.setInt('today_study_minutes', studyMinutes);
 
     final xp = GamificationService.totalXPNotifier.value > 0
         ? GamificationService.totalXPNotifier.value
-        : 150;
-
-    // Load today's live study minutes
-    final studyMinutes = prefs.getInt('today_study_minutes') ??
-        prefs.getInt('focus_timer_minutes_today') ??
-        0;
-
-    // Load today's screen time minutes (from usage stats if available)
-    final screenTimeMinutes = prefs.getInt('today_screen_time_minutes') ?? 0;
-
-    // Count today's completed habits
-    int completedHabits = 0;
-    for (int i = 1; i <= 5; i++) {
-      final isDone = prefs.getBool('flutter.user_${sbUser?.id ?? "guest"}_habit_def-${i}_completed') ??
-          prefs.getBool('user_${sbUser?.id ?? "guest"}_habit_def-${i}_completed') ??
-          false;
-      if (isDone) completedHabits++;
-    }
+        : await GamificationService.loadXP(userId: currentUserId);
 
     return SquadMember(
       id: currentUserId,
@@ -247,11 +285,30 @@ class SquadService {
       completedHabitsCount: completedHabits,
       xp: xp,
       isLeader: isLeader,
+      lastActiveAt: DateTime.now(),
     );
   }
 
+  /// Broadcasts current user's live progress (Screen Time, Study Time, Habits)
+  /// to all squads they belong to in Cloud Firestore.
+  /// Called automatically on habit toggle, timer session finish, or app load.
+  static Future<void> syncMyLiveProgressToAllSquads() async {
+    try {
+      final squads = await getSquads();
+      if (squads.isEmpty) return;
+
+      final me = await _resolveCurrentUserMember();
+      for (final s in squads) {
+        final isLeader = s.leaderId == me.id;
+        await _syncMemberToCloud(s.code, me.copyWith(isLeader: isLeader));
+      }
+    } catch (e) {
+      debugPrint('syncMyLiveProgressToAllSquads error: $e');
+    }
+  }
+
   /// Loads all user squads. If no squads exist, returns empty list.
-  /// (Strictly NO fake or dummy squads!)
+  /// Strictly NO fake or dummy squads!
   static Future<List<Squad>> getSquads() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_kSquadsPrefKey);
@@ -325,26 +382,28 @@ class SquadService {
     await _saveSquads(all);
 
     // Push squad header to Cloud Firestore
-    _syncSquadHeaderToCloud(newSquad);
+    await _syncSquadHeaderToCloud(newSquad);
 
     // Push leader's live member progress to Cloud Firestore
-    _syncMemberToCloud(code, me);
+    await _syncMemberToCloud(code, me);
 
     return newSquad;
   }
 
   /// Joins an existing real Squad using a 6-character Code.
-  /// Validates against cloud storage so real users on different phones can battle together!
+  /// Validates strictly against Cloud Firestore:
+  /// 1. Only a member who enters the valid Squad Code can join.
+  /// 2. Non-members cannot see who is inside the squad or their progress without joining.
   static Future<Squad?> joinSquad(String code) async {
     final cleanCode = code.trim().toUpperCase();
     if (cleanCode.isEmpty) return null;
 
     final all = await getSquads();
 
-    // 1. Check if already joined locally
+    // 1. If already joined locally, just refresh and return
     for (final s in all) {
       if (s.code.toUpperCase() == cleanCode) {
-        return s;
+        return refreshSquad(s);
       }
     }
 
@@ -358,9 +417,16 @@ class SquadService {
     // 3. Add current real logged-in user to the squad
     final me = await _resolveCurrentUserMember(isLeader: false);
 
-    // Filter out duplicate me if already in list
-    final members = cloudSquad.members.where((m) => m.id != me.id).toList();
-    members.add(me);
+    // Push current user's live progress to cloud for this squad
+    await _syncMemberToCloud(cleanCode, me);
+
+    // Fetch all members from cloud including newly joined me
+    final cloudMembers = await _fetchSquadMembersFromCloud(cleanCode);
+    final Map<String, SquadMember> memberMap = {};
+    for (final m in cloudMembers) {
+      memberMap[m.id] = m;
+    }
+    memberMap[me.id] = me;
 
     final updatedSquad = Squad(
       id: cloudSquad.id,
@@ -371,14 +437,11 @@ class SquadService {
       leaderId: cloudSquad.leaderId,
       leaderName: cloudSquad.leaderName,
       createdAt: cloudSquad.createdAt,
-      members: computeMemberBadges(members),
+      members: computeMemberBadges(memberMap.values.toList()),
     );
 
     all.insert(0, updatedSquad);
     await _saveSquads(all);
-
-    // Push current user's live progress to cloud for this squad
-    _syncMemberToCloud(cleanCode, me);
 
     return updatedSquad;
   }
@@ -431,11 +494,19 @@ class SquadService {
     }
   }
 
-  /// Leaves a squad and updates local cache
+  /// Leaves a squad, deletes cloud membership document, and updates local cache.
+  /// After leaving, the user can no longer view the members or their progress.
   static Future<void> leaveSquad(String code) async {
+    final cleanCode = code.trim().toUpperCase();
     final all = await getSquads();
-    all.removeWhere((s) => s.code.toUpperCase() == code.trim().toUpperCase());
+    all.removeWhere((s) => s.code.toUpperCase() == cleanCode);
     await _saveSquads(all);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final myId = LeaderboardService.resolveUserId(username: prefs.getString('user_name'));
+      await _deleteMemberFromCloud(cleanCode, myId);
+    } catch (_) {}
   }
 
   /// Cloud Helper: Pushes squad definition to community_leaderboard/squad_{CODE}
@@ -501,6 +572,17 @@ class SquadService {
     }
   }
 
+  /// Cloud Helper: Removes a member's progress record from Cloud Firestore when leaving
+  static Future<void> _deleteMemberFromCloud(String squadCode, String memberId) async {
+    try {
+      final docId = 'sqm_${squadCode}_$memberId';
+      final url = '$_firestoreBaseUrl/$docId?key=$_firestoreApiKey';
+      await http.delete(Uri.parse(url)).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      debugPrint('_deleteMemberFromCloud error: $e');
+    }
+  }
+
   /// Cloud Helper: Fetches squad definition from Cloud Firestore
   static Future<Squad?> _fetchSquadFromCloud(String code) async {
     try {
@@ -552,7 +634,7 @@ class SquadService {
   static Future<List<SquadMember>> _fetchSquadMembersFromCloud(String code) async {
     final List<SquadMember> members = [];
     try {
-      final url = '$_firestoreBaseUrl?key=$_firestoreApiKey';
+      final url = '$_firestoreBaseUrl?pageSize=300&key=$_firestoreApiKey';
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 6));
 
       if (response.statusCode == 200) {
@@ -571,6 +653,7 @@ class SquadService {
                 final xp = int.tryParse(fields['xp']?['integerValue']?.toString() ?? '0') ?? 0;
                 final streak = int.tryParse(fields['streakDays']?['integerValue']?.toString() ?? '1') ?? 1;
                 final badge = fields['badgeTitle']?['stringValue'] as String? ?? '';
+                final updatedStr = fields['updatedAt']?['stringValue'] as String?;
 
                 int studyMin = 0;
                 int screenMin = 0;
@@ -597,6 +680,7 @@ class SquadService {
                   completedHabitsCount: habitsDone,
                   xp: xp,
                   isLeader: isLeader,
+                  lastActiveAt: updatedStr != null ? DateTime.tryParse(updatedStr) : null,
                 ));
               }
             }
@@ -618,10 +702,10 @@ class SquadService {
       message = '''⚔️ *Habit-Nova हॅबिट बॅटल: माझ्या स्क्वॉडमध्ये सामील व्हा!* ⚔️
 
 मी *${squad.name}* (${squad.category}) स्क्वॉड बनवला आहे!
-तुझ्यात हिंमत असेल तर माझ्यासोबत ७ दिवसांच्या हॅबिट आणि फोकस बॅटलमध्ये ये! बघू कोणाचा स्ट्रिक टिकतो आणि कोण MVP बनतो! 👑
+तुझ्यात हिंमत असेल तर माझ्यासोबत ७ दिवसांच्या हॅबिट, स्टडी आणि स्क्रीन टाईम बॅटलमध्ये ये! बघू कोणाचा स्ट्रिक टिकतो आणि कोण MVP बनतो! 👑
 
 🚀 *स्क्वॉड कोड:* *${squad.code}*
-📲 *Habit-Nova डाऊनलोड करा व जॉईन व्हा:*
+📲 *Habit-Nova वर 'कोडने जॉईन व्हा' निवडा व वरील कोड टाका:*
 https://habitnova.app/join?code=${squad.code}
 
 #HabitNova #FocusBattle #Consistency''';
@@ -629,10 +713,10 @@ https://habitnova.app/join?code=${squad.code}
       message = '''⚔️ *Habit-Nova हैबिट बैटल: मेरे स्क्वाड में शामिल हों!* ⚔️
 
 मैंने *${squad.name}* (${squad.category}) स्क्वाड बनाया है!
-अगर आपमें हिम्मत है तो मेरे साथ 7 दिनों की हैबिट और फोकस बैटल में आएं! देखते हैं किसकी स्ट्रीक टिकती है और कौन MVP बनता है! 👑
+अगर आपमें हिम्मत है तो मेरे साथ 7 दिनों की हैबिट, स्टडी और स्क्रीन टाइम बैटल में आएं! देखते हैं किसकी स्ट्रीक टिकती है और कौन MVP बनता है! 👑
 
 🚀 *स्क्वाड कोड:* *${squad.code}*
-📲 *Habit-Nova डाउनलोड करें और जुड़ें:*
+📲 *Habit-Nova पर 'कोड से जुड़ें' चुनें और कोड दर्ज करें:*
 https://habitnova.app/join?code=${squad.code}
 
 #HabitNova #FocusBattle #Consistency''';
@@ -640,10 +724,10 @@ https://habitnova.app/join?code=${squad.code}
       message = '''⚔️ *Habit-Nova Habit Battle: Join My Squad!* ⚔️
 
 I have created the *${squad.name}* (${squad.category}) squad!
-Challenge accepted? Join me in a 7-day Habit & Focus battle to see who maintains their streak and becomes the MVP! 👑
+Challenge accepted? Join me in a 7-day Habit, Study & Screen Time battle to see who maintains their streak and becomes the MVP! 👑
 
 🚀 *Squad Code:* *${squad.code}*
-📲 *Download Habit-Nova & Join:*
+📲 *Open Habit-Nova -> Join with Code:*
 https://habitnova.app/join?code=${squad.code}
 
 #HabitNova #FocusBattle #Consistency''';

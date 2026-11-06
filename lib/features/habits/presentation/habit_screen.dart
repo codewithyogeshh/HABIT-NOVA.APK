@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
+import 'package:synvero/core/widgets/ambient_mesh_background.dart';
+import 'package:flutter/services.dart';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/habit_daily_service.dart';
@@ -166,50 +168,53 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _toggleCompletion(String habitId, bool isRealDb) async {
+    // 1. Instant tactile micro-feedback
+    HapticFeedback.lightImpact();
+
     bool becameCompleted = false;
     String habitName = 'Habit';
 
     if (isRealDb) {
       final isCurrentlyCompleted = _todayCompletion[habitId] ?? false;
       becameCompleted = !isCurrentlyCompleted;
-      try {
-        if (isCurrentlyCompleted) {
-          await _repository.uncompleteHabit(habitId, DateTime.now());
-        } else {
-          await _repository.completeHabit(habitId, DateTime.now());
-        }
-        final status = await _repository.getTodaysCompletionStatus();
-        if (mounted) {
-          setState(() {
-            _todayCompletion = status;
-          });
-        }
-      } catch (_) {}
+      final habit = _habits.firstWhere((h) => h.id == habitId, orElse: () => Habit(id: '', userId: '', name: 'Habit', createdAt: DateTime.now(), updatedAt: DateTime.now()));
+      habitName = habit.name;
+
+      // Instant optimistic UI update
+      setState(() {
+        _todayCompletion[habitId] = becameCompleted;
+      });
+
+      unawaited(() async {
+        try {
+          if (!becameCompleted) {
+            await _repository.uncompleteHabit(habitId, DateTime.now());
+          } else {
+            await _repository.completeHabit(habitId, DateTime.now());
+          }
+        } catch (_) {}
+      }());
     } else {
       // Toggle for default fallback habits with date-aware midnight reset support
       final habit = _defaultHabits.firstWhere((h) => h['id'] == habitId);
       final newStatus = !(habit['completed'] as bool);
       becameCompleted = newStatus;
       habitName = habit['name'] as String? ?? 'Habit';
+
+      // Instant optimistic UI update
       setState(() {
         habit['completed'] = newStatus;
         habit['subtitle'] = _getHabitSubtitle(habitId, newStatus);
       });
-      await HabitDailyService.setHabitCompletedToday(_currentUserId, habitId, newStatus);
+
+      unawaited(HabitDailyService.setHabitCompletedToday(_currentUserId, habitId, newStatus));
     }
 
     if (becameCompleted) {
-      await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
       final doneCount = isRealDb
           ? _todayCompletion.values.where((v) => v).length
           : _defaultHabits.where((h) => h['completed'] == true).length;
-      await GamificationService.checkAndAwardBadges(
-        streakDays: doneCount > 0 ? 1 : 0,
-        habitsCompletedToday: doneCount,
-        waterGlassesToday: 4,
-        studySessionsToday: 0,
-        tasksDoneToday: 0,
-      );
+
       if (mounted) {
         CelebrationDialog.show(
           context,
@@ -218,10 +223,21 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
           streakDays: doneCount > 0 ? 1 : 0,
         );
       }
-    }
 
-    // Update live progress on Android Home Widget
-    AppWidgetService.syncWidget();
+      unawaited(() async {
+        await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
+        await GamificationService.checkAndAwardBadges(
+          streakDays: doneCount > 0 ? 1 : 0,
+          habitsCompletedToday: doneCount,
+          waterGlassesToday: 4,
+          studySessionsToday: 0,
+          tasksDoneToday: 0,
+        );
+        AppWidgetService.syncWidget();
+      }());
+    } else {
+      AppWidgetService.syncWidget();
+    }
   }
 
   Future<void> _showAddScheduleDialog() async {
@@ -544,7 +560,8 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      body: SafeArea(
+      body: AmbientMeshBackground(
+        child: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
             : RefreshIndicator(
@@ -701,6 +718,7 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                   ),
                 ),
               ),
+      ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

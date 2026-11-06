@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
+import 'package:synvero/core/services/squad_service.dart';
 
 /// Service responsible for managing daily habit states and automatic midnight (12:00 AM) resets.
 ///
@@ -76,6 +77,9 @@ class HabitDailyService {
 
       // Update widget
       AppWidgetService.syncWidget();
+
+      // Realtime cloud sync for squads
+      SquadService.syncMyLiveProgressToAllSquads();
     } catch (e) {
       debugPrint('Error setting habit completion: $e');
     }

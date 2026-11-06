@@ -1,6 +1,10 @@
+import 'dart:async';
+import 'package:flutter/services.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:synvero/core/widgets/ambient_mesh_background.dart';
+import 'dart:ui';
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/notification_service.dart';
@@ -92,23 +96,35 @@ class _TasksScreenState extends State<TasksScreen> {
 
   Future<void> _toggleTask(TaskItem task) async {
     final becameCompleted = !task.isCompleted;
-    await TaskService.toggleTask(task);
-    await _loadTasks();
-    if (becameCompleted) {
-      await GamificationService.addXP(GamificationService.xpPerTask, reason: 'Completed Task');
-      final doneCount = _tasks.where((t) => t.isCompleted).length;
-      if (doneCount >= 4) {
-        await GamificationService.unlockBadge('task_crusher');
-      }
-      if (mounted) {
-        CelebrationDialog.show(
-          context,
-          title: 'Task Completed! 🚀',
-          subtitle: '${task.title} (+30 XP)',
-          streakDays: doneCount,
-        );
-      }
+
+    // 1. Instant tactile micro-feedback + 0-latency UI state toggle
+    HapticFeedback.lightImpact();
+    setState(() {
+      task.isCompleted = becameCompleted;
+    });
+
+    final doneCount = _tasks.where((t) => t.isCompleted).length;
+
+    // 2. Immediate celebratory visual reward
+    if (becameCompleted && mounted) {
+      CelebrationDialog.show(
+        context,
+        title: 'Task Completed! 🚀',
+        subtitle: '${task.title} (+30 XP)',
+        streakDays: doneCount,
+      );
     }
+
+    // 3. Asynchronously persist to storage, alarms & gamification in background (Zero UI lag)
+    unawaited(() async {
+      await TaskService.toggleTask(task);
+      if (becameCompleted) {
+        await GamificationService.addXP(GamificationService.xpPerTask, reason: 'Completed Task');
+        if (doneCount >= 4) {
+          await GamificationService.unlockBadge('task_crusher');
+        }
+      }
+    }());
   }
 
   Future<void> _deleteTask(String id) async {
@@ -386,7 +402,6 @@ class _TasksScreenState extends State<TasksScreen> {
     final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
     final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
     final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
-    final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
 
     final now = DateTime.now();
 
@@ -462,7 +477,8 @@ class _TasksScreenState extends State<TasksScreen> {
           ),
         ],
       ),
-      body: SafeArea(
+      body: AmbientMeshBackground(
+        child: SafeArea(
         child: _isLoading
             ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
             : RefreshIndicator(
@@ -734,53 +750,72 @@ class _TasksScreenState extends State<TasksScreen> {
                 ),
               ),
       ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: kBottomNavBg,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0),
-              width: 1.0,
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(26),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF071728).withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.22) : const Color(0xFFE2E8F0),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+                      blurRadius: 20,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: BottomNavigationBar(
+                  currentIndex: _currentTabIndex,
+                  elevation: 0,
+                  onTap: (index) {
+                    setState(() {
+                      _currentTabIndex = index;
+                    });
+                    if (index == 0) {
+                      Navigator.of(context).pushReplacementNamed('/dashboard');
+                    } else if (index == 1) {
+                      Navigator.of(context).pushNamed('/habits');
+                    } else if (index == 2) {
+                      Navigator.of(context).pushNamed('/timer');
+                    } else if (index == 4) {
+                      Navigator.of(context).pushNamed('/profile');
+                    }
+                  },
+                  type: BottomNavigationBarType.fixed,
+                  backgroundColor: Colors.transparent,
+                  selectedItemColor: isDark ? const Color(0xFF00F0FF) : kPrimaryColor,
+                  unselectedItemColor:
+                      isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  selectedLabelStyle:
+                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                  unselectedLabelStyle:
+                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
+                  items: const [
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.home_rounded), label: 'Home'),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.calendar_today_rounded), label: 'Habits'),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.timer_outlined), label: 'Timer'),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.checklist_rounded), label: 'Tasks'),
+                    BottomNavigationBarItem(
+                        icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: _currentTabIndex,
-          onTap: (index) {
-            setState(() {
-              _currentTabIndex = index;
-            });
-            if (index == 0) {
-              Navigator.of(context).pushReplacementNamed('/dashboard');
-            } else if (index == 1) {
-              Navigator.of(context).pushNamed('/habits');
-            } else if (index == 2) {
-              Navigator.of(context).pushNamed('/timer');
-            } else if (index == 4) {
-              Navigator.of(context).pushNamed('/profile');
-            }
-          },
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: kBottomNavBg,
-          selectedItemColor: kPrimaryColor,
-          unselectedItemColor:
-              isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-          selectedLabelStyle:
-              const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle:
-              const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
-          items: const [
-            BottomNavigationBarItem(
-                icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_today_rounded), label: 'Habits'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.timer_outlined), label: 'Timer'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.checklist_rounded), label: 'Tasks'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
-          ],
         ),
       ),
     );

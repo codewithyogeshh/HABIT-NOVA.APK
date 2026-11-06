@@ -1,3 +1,4 @@
+import 'package:synvero/core/services/language_service.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/navigation/app_navigator.dart';
 
@@ -32,7 +33,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   // High-priority alarm channel (Loud ringing audio stream)
-  static const String _alarmChannelId = 'synvero_alarm_clock_channel_v6';
+  static const String _alarmChannelId = 'synvero_alarm_clock_channel_v7';
   static const String _alarmChannelName = 'Synvero Task Alarms (Loud)';
   static const String _alarmChannelDescription =
       'High priority ringing alarm alerts for scheduled tasks and habits';
@@ -45,10 +46,22 @@ class NotificationService {
       'Ongoing notification while Focus Timer or Ambient Sounds are active';
 
   // 5-minute advance reminder channel
-  static const String _reminderChannelId = 'synvero_task_reminders_channel_v6';
+  static const String _reminderChannelId = 'synvero_task_reminders_channel_v7';
   static const String _reminderChannelName = 'Synvero Task Reminders (5 Min Prior)';
   static const String _reminderChannelDescription =
       'Advance reminder notifications 5 minutes before scheduled task time';
+
+  // Daily Habits channel
+  static const String _habitsChannelId = 'synvero_habits_channel_v2';
+  static const String _habitsChannelName = 'Habit & Streak Reminders';
+  static const String _habitsChannelDescription =
+      'Reminders to complete daily habits and keep your streak burning';
+
+  // Hydration & Water channel
+  static const String _hydrateChannelId = 'synvero_hydrate_channel_v2';
+  static const String _hydrateChannelName = 'Hydration & Water Reminders';
+  static const String _hydrateChannelDescription =
+      'Regular reminders throughout the day to drink water and stay healthy';
 
   static bool _isInitialized = false;
   /// Active alarm notifier. The app listens to this to show the in-app Stop Alarm dialog.
@@ -88,9 +101,6 @@ class NotificationService {
   static const String _prefNutrition = 'synvero_notif_nutrition';
   static const String _prefTasks = 'synvero_notif_tasks';
 
-  // Alarm ringtone URI on Android
-  static const UriAndroidNotificationSound _alarmSound =
-      UriAndroidNotificationSound('content://settings/system/alarm_alert');
 
   // Alarm vibration rhythm (repeating pulse)
   static final Int64List _alarmVibration =
@@ -155,14 +165,13 @@ class NotificationService {
                 AndroidFlutterLocalNotificationsPlugin>();
 
         if (androidImplementation != null) {
-          // 1. Loud Alarm Channel (Uses Alarm Audio Stream)
+          // 1. Loud Alarm Channel (Uses Alarm Audio Stream & Native Alarm Tone)
           final alarmChannel = AndroidNotificationChannel(
             _alarmChannelId,
             _alarmChannelName,
             description: _alarmChannelDescription,
             importance: Importance.max,
             playSound: true,
-            sound: _alarmSound,
             enableVibration: true,
             vibrationPattern: _alarmVibration,
             enableLights: true,
@@ -182,7 +191,31 @@ class NotificationService {
           );
           await androidImplementation.createNotificationChannel(reminderChannel);
 
-          // 3. Ongoing Focus Timer & Sound Channel
+          // 3. Daily Habits Channel
+          const habitsChannel = AndroidNotificationChannel(
+            _habitsChannelId,
+            _habitsChannelName,
+            description: _habitsChannelDescription,
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+          );
+          await androidImplementation.createNotificationChannel(habitsChannel);
+
+          // 4. Hydration & Water Channel
+          const hydrateChannel = AndroidNotificationChannel(
+            _hydrateChannelId,
+            _hydrateChannelName,
+            description: _hydrateChannelDescription,
+            importance: Importance.high,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+          );
+          await androidImplementation.createNotificationChannel(hydrateChannel);
+
+          // 5. Ongoing Focus Timer & Sound Channel
           const focusChannel = AndroidNotificationChannel(
             _focusChannelId,
             _focusChannelName,
@@ -341,7 +374,6 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.max,
         playSound: true,
-        sound: _alarmSound,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: true,
         vibrationPattern: _alarmVibration,
@@ -460,7 +492,6 @@ class NotificationService {
         importance: Importance.max,
         priority: Priority.max,
         playSound: true,
-        sound: _alarmSound,
         audioAttributesUsage: AudioAttributesUsage.alarm,
         enableVibration: true,
         vibrationPattern: _alarmVibration,
@@ -509,8 +540,7 @@ class NotificationService {
               importance: Importance.max,
               priority: Priority.max,
               playSound: true,
-              sound: _alarmSound,
-              audioAttributesUsage: AudioAttributesUsage.alarm,
+                    audioAttributesUsage: AudioAttributesUsage.alarm,
               vibrationPattern: _alarmVibration,
               category: AndroidNotificationCategory.alarm,
               additionalFlags: Int32List.fromList([4]),
@@ -591,36 +621,88 @@ class NotificationService {
     }
   }
 
-  /// Schedules recurring daily reminders 3 times a day (11:30 AM, 5:30 PM, 9:15 PM)
-  /// to encourage user engagement, habit tracking, and streak maintenance.
+  /// Schedules recurring daily habit streak reminders 3 times a day (11:30 AM, 5:30 PM, 9:15 PM)
+  /// with localized Marathi, Hindi, and English copy.
   static Future<void> scheduleDailyHabitReminders() async {
     if (kIsWeb) return;
     try {
       _setupLocalTimezone();
+      final lang = LanguageService.currentLanguageCode;
 
-      final reminders = [
-        {
-          'id': 9001,
-          'hour': 11,
-          'minute': 30,
-          'title': '☀️ Midday Habit Check-in!',
-          'body': 'Did you complete your morning habits? Open HabbitNova to check off your progress! 🔥',
-        },
-        {
-          'id': 9002,
-          'hour': 17,
-          'minute': 30,
-          'title': '🎯 Afternoon Task Momentum',
-          'body': "How are today's tasks going? Check off what you completed and finish strong today! 💪",
-        },
-        {
-          'id': 9003,
-          'hour': 21,
-          'minute': 15,
-          'title': '🌙 Evening Streak Saver!',
-          'body': "Don't break your streak! 1 tap to complete today's remaining habits before bed. 🌟",
-        },
-      ];
+      final List<Map<String, dynamic>> reminders;
+      if (lang == LanguageService.marathi) {
+        reminders = [
+          {
+            'id': 9001,
+            'hour': 11,
+            'minute': 30,
+            'title': '☀️ सकाळचे हॅबिट्स पूर्ण झाले का?',
+            'body': 'दुपार होण्यापूर्वी आजचे मॉर्निंग हॅबिट्स पूर्ण करा आणि स्ट्रिक टिकवून ठेवा! 🔥',
+          },
+          {
+            'id': 9002,
+            'hour': 17,
+            'minute': 30,
+            'title': '🎯 दुपारचे टास्क व प्रगती',
+            'body': 'आजची उद्दिष्टे पूर्ण करण्याकडे लक्ष द्या. स्वतःला सिद्ध करण्याची हीच वेळ आहे! 💪',
+          },
+          {
+            'id': 9003,
+            'hour': 21,
+            'minute': 15,
+            'title': '🌙 रात्रीची स्ट्रिक सेव्हर आठवण!',
+            'body': 'आजचा स्ट्रिक मोडू नका! झोपण्यापूर्वी शिल्लक राहिलेले हॅबिट्स पूर्ण करा. 🌟',
+          },
+        ];
+      } else if (lang == LanguageService.hindi) {
+        reminders = [
+          {
+            'id': 9001,
+            'hour': 11,
+            'minute': 30,
+            'title': '☀️ दोपहर का हैबिट चेक-इन!',
+            'body': 'क्या आपने सुबह की आदतें पूरी कीं? अपनी स्ट्रीक जारी रखने के लिए ऐप खोलें! 🔥',
+          },
+          {
+            'id': 9002,
+            'hour': 17,
+            'minute': 30,
+            'title': '🎯 आज के टास्क की गति',
+            'body': 'आज के लक्ष्य पूरे करने में जुट जाएं। अपनी ताकत दिखाएं! 💪',
+          },
+          {
+            'id': 9003,
+            'hour': 21,
+            'minute': 15,
+            'title': '🌙 नाइट स्ट्रीक सेवर!',
+            'body': 'अपनी स्ट्रीक न टूटने दें! सोने से पहले बची हुई आदतें पूरी करें। 🌟',
+          },
+        ];
+      } else {
+        reminders = [
+          {
+            'id': 9001,
+            'hour': 11,
+            'minute': 30,
+            'title': '☀️ Midday Habit Check-in!',
+            'body': 'Did you complete your morning habits? Open HabbitNova to keep your streak burning! 🔥',
+          },
+          {
+            'id': 9002,
+            'hour': 17,
+            'minute': 30,
+            'title': '🎯 Afternoon Task Momentum',
+            'body': "How are today's tasks going? Check off what you completed and finish strong today! 💪",
+          },
+          {
+            'id': 9003,
+            'hour': 21,
+            'minute': 15,
+            'title': '🌙 Evening Streak Saver!',
+            'body': "Don't break your streak! 1 tap to complete today's remaining habits before bed. 🌟",
+          },
+        ];
+      }
 
       for (final r in reminders) {
         final id = r['id'] as int;
@@ -636,12 +718,13 @@ class NotificationService {
         }
 
         const androidDetails = AndroidNotificationDetails(
-          _reminderChannelId,
-          _reminderChannelName,
-          channelDescription: _reminderChannelDescription,
+          _habitsChannelId,
+          _habitsChannelName,
+          channelDescription: _habitsChannelDescription,
           importance: Importance.high,
           priority: Priority.high,
           playSound: true,
+          enableVibration: true,
         );
 
         const notificationDetails = NotificationDetails(
@@ -665,9 +748,205 @@ class NotificationService {
           matchDateTimeComponents: DateTimeComponents.time,
         );
       }
-      debugPrint('Daily 3x habit reminders successfully scheduled!');
+      debugPrint('Daily 3x habit reminders successfully scheduled with OS AlarmManager!');
     } catch (e) {
       debugPrint('Error scheduling daily habit reminders: $e');
+    }
+  }
+
+  /// Schedules recurring daily hydration reminders across the day (9 AM, 11 AM, 1:30 PM, 4 PM, 6:30 PM, 8:30 PM)
+  /// in Marathi, Hindi, or English so users stay hydrated even when the app is closed.
+  static Future<void> scheduleDailyHydrationReminders() async {
+    if (kIsWeb) return;
+    try {
+      _setupLocalTimezone();
+      final lang = LanguageService.currentLanguageCode;
+
+      final List<Map<String, dynamic>> waterReminders;
+      if (lang == LanguageService.marathi) {
+        waterReminders = [
+          {
+            'id': 9101,
+            'hour': 9,
+            'minute': 0,
+            'title': '💧 सकाळची हायड्रेशन आठवण!',
+            'body': 'दिवसाची सुरुवात १ ग्लास ताज्या पाण्याने करा! ऊर्जेने भरलेला दिवस जगा. 🌊',
+          },
+          {
+            'id': 9102,
+            'hour': 11,
+            'minute': 0,
+            'title': '💧 पाणी प्या, फोकस वाढवा!',
+            'body': 'फोकस कमी होतोय का? १ मोठा ग्लास पाणी प्या आणि मेंदू तल्लख ठेवा! 🧠',
+          },
+          {
+            'id': 9103,
+            'hour': 13,
+            'minute': 30,
+            'title': '💧 जेवणानंतर हायड्रेशन',
+            'body': 'दुपारच्या जेवणानंतर पचनक्रिया उत्तम राहण्यासाठी पुरेसे पाणी प्या! 💧',
+          },
+          {
+            'id': 9104,
+            'hour': 16,
+            'minute': 0,
+            'title': '💧 दुपारचा ताजेतवाना घोट',
+            'body': 'आळस घालवण्यासाठी आताच एक ग्लास पाणी पिऊन ताजेतवाने व्हा! ⚡',
+          },
+          {
+            'id': 9105,
+            'hour': 18,
+            'minute': 30,
+            'title': '💧 संध्याकाळचे हायड्रेशन',
+            'body': 'संध्याकाळचा वर्कआउट किंवा अभ्यास आधी पाणी पिऊन शरीर हायड्रेटेड ठेवा! 🏃‍♂️',
+          },
+          {
+            'id': 9106,
+            'hour': 20,
+            'minute': 30,
+            'title': '💧 पाण्याचे दैनंदिन ध्येय पूर्ण करा!',
+            'body': 'आज ८ ग्लास पाणी पिण्याचे ध्येय पूर्ण झाले का? HabbitNova मध्ये नोंद करा! 🎯',
+          },
+        ];
+      } else if (lang == LanguageService.hindi) {
+        waterReminders = [
+          {
+            'id': 9101,
+            'hour': 9,
+            'minute': 0,
+            'title': '💧 सुबह का हाइड्रेशन!',
+            'body': 'दिन की शुरुआत एक गिलास ताजे पानी से करें। ऊर्जावान रहें! 🌊',
+          },
+          {
+            'id': 9102,
+            'hour': 11,
+            'minute': 0,
+            'title': '💧 पानी पिएं, फोकस बढ़ाएं!',
+            'body': 'एक गिलास पानी पीकर अपने दिमाग और शरीर को तरोताजा रखें! 🧠',
+          },
+          {
+            'id': 9103,
+            'hour': 13,
+            'minute': 30,
+            'title': '💧 दोपहर का पानी ब्रेक',
+            'body': 'अच्छे पाचन और स्वास्थ्य के लिए पानी पीना न भूलें! 💧',
+          },
+          {
+            'id': 9104,
+            'hour': 16,
+            'minute': 0,
+            'title': '💧 शाम की ताजगी',
+            'body': 'आलस दूर भगाएं, एक गिलास ठंडा पानी पिएं! ⚡',
+          },
+          {
+            'id': 9105,
+            'hour': 18,
+            'minute': 30,
+            'title': '💧 हाइड्रेटेड रहें',
+            'body': 'अपने स्वास्थ्य का ध्यान रखें, पानी का एक घूंट लें! 🏃‍♂️',
+          },
+          {
+            'id': 9106,
+            'hour': 20,
+            'minute': 30,
+            'title': '💧 दैनिक पानी का लक्ष्य!',
+            'body': 'क्या आज आपने 8 गिलास पानी पी लिया? HabbitNova में चेक करें! 🎯',
+          },
+        ];
+      } else {
+        waterReminders = [
+          {
+            'id': 9101,
+            'hour': 9,
+            'minute': 0,
+            'title': '💧 Morning Hydration Boost!',
+            'body': 'Start your day with a fresh glass of water to activate your body! 🌊',
+          },
+          {
+            'id': 9102,
+            'hour': 11,
+            'minute': 0,
+            'title': '💧 Drink Water, Stay Sharp!',
+            'body': 'Feeling sluggish? A glass of water recharges your focus and brainpower! 🧠',
+          },
+          {
+            'id': 9103,
+            'hour': 13,
+            'minute': 30,
+            'title': '💧 Post-Lunch Hydration',
+            'body': 'Keep your digestion smooth and energy steady with a glass of water! 💧',
+          },
+          {
+            'id': 9104,
+            'hour': 16,
+            'minute': 0,
+            'title': '💧 Afternoon Refresh',
+            'body': 'Beat the afternoon slump with a quick glass of water! ⚡',
+          },
+          {
+            'id': 9105,
+            'hour': 18,
+            'minute': 30,
+            'title': '💧 Evening Hydration',
+            'body': 'Stay hydrated before your workout or evening study session! 🏃‍♂️',
+          },
+          {
+            'id': 9106,
+            'hour': 20,
+            'minute': 30,
+            'title': '💧 Water Goal Check-in!',
+            'body': 'Did you hit your 8-glass daily water goal? Open HabbitNova to track! 🎯',
+          },
+        ];
+      }
+
+      for (final r in waterReminders) {
+        final id = r['id'] as int;
+        final hour = r['hour'] as int;
+        final minute = r['minute'] as int;
+        final title = r['title'] as String;
+        final body = r['body'] as String;
+
+        final now = tz.TZDateTime.now(tz.local);
+        var scheduled = tz.TZDateTime(tz.local, now.year, now.month, now.day, hour, minute);
+        if (scheduled.isBefore(now)) {
+          scheduled = scheduled.add(const Duration(days: 1));
+        }
+
+        const androidDetails = AndroidNotificationDetails(
+          _hydrateChannelId,
+          _hydrateChannelName,
+          channelDescription: _hydrateChannelDescription,
+          importance: Importance.high,
+          priority: Priority.high,
+          playSound: true,
+          enableVibration: true,
+        );
+
+        const notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
+          ),
+        );
+
+        await _notificationsPlugin.zonedSchedule(
+          id,
+          title,
+          body,
+          scheduled,
+          notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
+      debugPrint('Daily 6x hydration reminders successfully scheduled with OS AlarmManager!');
+    } catch (e) {
+      debugPrint('Error scheduling daily hydration reminders: $e');
     }
   }
 

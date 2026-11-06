@@ -276,73 +276,74 @@ class _WaterTrackerCardState extends State<WaterTrackerCard> with WidgetsBinding
 
           const SizedBox(height: 16),
 
-          // 8 Interactive Glasses
+          // 8 Interactive Glasses (Proportionally Scaled with Expanded to prevent overflow on ANY screen)
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(_targetGlasses, (index) {
               final isFilled = index < _glassesFilled;
 
-              return GestureDetector(
-                onTap: () {
-                  // Tapping a glass marks progress forward
-                  _setGlassCount(index + 1);
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeInOut,
-                  width: 32,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isFilled
-                        ? const Color(0xFF00F0FF).withValues(alpha: 0.2)
-                        : (isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9)),
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(5),
-                      bottom: Radius.circular(10),
-                    ),
-                    border: Border.all(
-                      color: isFilled ? const Color(0xFF00F0FF) : kBorderColor,
-                      width: isFilled ? 1.6 : 1.0,
-                    ),
-                    boxShadow: isFilled
-                        ? [
-                            BoxShadow(
-                              color: const Color(0xFF00F0FF).withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
+              return Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 2.5),
+                  child: GestureDetector(
+                    onTap: () {
+                      _setGlassCount(index + 1);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: isFilled
+                            ? const Color(0xFF00F0FF).withValues(alpha: 0.2)
+                            : (isDark ? const Color(0xFF030814) : const Color(0xFFF1F5F9)),
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(5),
+                          bottom: Radius.circular(10),
+                        ),
+                        border: Border.all(
+                          color: isFilled ? const Color(0xFF00F0FF) : kBorderColor,
+                          width: isFilled ? 1.6 : 1.0,
+                        ),
+                        boxShadow: isFilled
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF00F0FF).withValues(alpha: 0.35),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Stack(
+                        alignment: Alignment.bottomCenter,
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            width: double.infinity,
+                            height: isFilled ? 32 : 0,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF00F0FF), Color(0xFF0284C7)],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                              borderRadius: const BorderRadius.vertical(
+                                bottom: Radius.circular(8),
+                              ),
                             ),
-                          ]
-                        : [],
-                  ),
-                  child: Stack(
-                    alignment: Alignment.bottomCenter,
-                    children: [
-                      // Water filling level animation
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        width: double.infinity,
-                        height: isFilled ? 32 : 0,
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFF00F0FF), Color(0xFF0284C7)],
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
                           ),
-                          borderRadius: const BorderRadius.vertical(
-                            bottom: Radius.circular(8),
+                          Center(
+                            child: Icon(
+                              Icons.water_drop_rounded,
+                              size: 14,
+                              color: isFilled
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF1E2D48) : const Color(0xFFCBD5E1)),
+                            ),
                           ),
-                        ),
+                        ],
                       ),
-                      Center(
-                        child: Icon(
-                          Icons.water_drop_rounded,
-                          size: 14,
-                          color: isFilled
-                              ? Colors.white
-                              : (isDark ? const Color(0xFF1E2D48) : const Color(0xFFCBD5E1)),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               );

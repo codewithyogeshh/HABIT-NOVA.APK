@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/focus_sound_service.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/core/services/notification_service.dart';
+import 'package:synvero/core/services/squad_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 
 /// Global background focus timer service.
@@ -159,6 +160,8 @@ class FocusTimerService {
         await prefs.setInt('user_${_currentUserId}_timer_completed_sessions', completedSessionsNotifier.value);
         await GamificationService.addXP(GamificationService.xpPerStudyTimer, reason: 'Completed Focus Session');
         await GamificationService.unlockBadge('focus_titan');
+        // Realtime cloud sync for squads
+        SquadService.syncMyLiveProgressToAllSquads();
       } catch (_) {}
     }
 

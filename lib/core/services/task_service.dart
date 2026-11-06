@@ -178,4 +178,41 @@ class TaskService {
       return false;
     }).toList();
   }
+
+  /// Reschedules alarms and 5-min reminders for all upcoming, uncompleted tasks in storage.
+  /// Called on app startup to guarantee no alarms are missed after reboot or app kill.
+  static Future<void> rescheduleAllPendingTaskAlarms() async {
+    try {
+      final tasks = await getTasks();
+      final now = DateTime.now();
+      int count = 0;
+      for (final task in tasks) {
+        if (!task.isCompleted && task.scheduledDate != null && task.scheduledDate!.isAfter(now)) {
+          final notifId = task.id.hashCode & 0x7fffffff;
+          // 1. Exact loud ringing alarm at task time
+          await NotificationService.scheduleTaskAlarm(
+            id: notifId,
+            title: '🚨 Task Alarm: ${task.title}',
+            body: "वेळ झाली! It's ${task.time} - Time to complete: ${task.title}",
+            scheduledDate: task.scheduledDate!,
+          );
+
+          // 2. Advance reminder 5 minutes before
+          final reminderTime = task.scheduledDate!.subtract(const Duration(minutes: 5));
+          if (reminderTime.isAfter(now)) {
+            await NotificationService.scheduleAdvanceReminder(
+              id: (notifId + 1000000) & 0x7fffffff,
+              title: '⏳ 5-Min Reminder: ${task.title}',
+              body: '${task.title} ची वेळ ५ मिनिटांत (${task.time}) होणार आहे!',
+              scheduledDate: reminderTime,
+            );
+          }
+          count++;
+        }
+      }
+      debugPrint('Rescheduled alarms for $count pending tasks.');
+    } catch (e) {
+      debugPrint('rescheduleAllPendingTaskAlarms error: $e');
+    }
+  }
 }
