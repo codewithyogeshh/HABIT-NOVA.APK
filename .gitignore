@@ -53,3 +53,4 @@ android/.kotlin/
 # Agent skills & local tooling
 .agents/
 skills-lock.json
+.wrangler/

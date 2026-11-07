@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'focus_sound_platform_stub.dart'
+    if (dart.library.js_interop) 'focus_sound_platform_web.dart' as web_audio;
 
 /// Focus sound item model
 class FocusSoundOption {
@@ -59,7 +61,11 @@ class FocusSoundService {
   /// Plays the selected ambient sound
   static Future<void> playSound(String soundId) async {
     currentSoundIdNotifier.value = soundId;
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (kIsWeb) {
+      await web_audio.playWebFocusSound(soundId, volumeNotifier.value);
+      return;
+    }
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('playFocusSound', {
         'type': soundId,
@@ -73,7 +79,11 @@ class FocusSoundService {
   /// Stops any currently playing ambient sound
   static Future<void> stopSound() async {
     currentSoundIdNotifier.value = null;
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (kIsWeb) {
+      await web_audio.stopWebFocusSound();
+      return;
+    }
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('stopFocusSound');
     } catch (e) {
@@ -84,7 +94,11 @@ class FocusSoundService {
   /// Updates volume level (0.0 to 1.0)
   static Future<void> setVolume(double vol) async {
     volumeNotifier.value = vol.clamp(0.0, 1.0);
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+    if (kIsWeb) {
+      await web_audio.setWebFocusVolume(volumeNotifier.value);
+      return;
+    }
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('setFocusVolume', {
         'volume': volumeNotifier.value,

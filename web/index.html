@@ -76,6 +76,60 @@
       }
       return false;
     };
+
+    window.synveroFocusAudio = null;
+
+    window.synveroPlayFocusSound = function(soundType, volume) {
+      try {
+        if (window.synveroFocusAudio) {
+          window.synveroFocusAudio.pause();
+          window.synveroFocusAudio.currentTime = 0;
+          window.synveroFocusAudio = null;
+        }
+        const audioSrc = 'assets/assets/audio/focus_' + soundType + '.mp3';
+        const audio = new Audio(audioSrc);
+        audio.loop = true;
+        audio.volume = Math.max(0, Math.min(1, volume != null ? volume : 0.8));
+        audio.play().catch(function() {
+          const fallback = new Audio('assets/audio/focus_' + soundType + '.mp3');
+          fallback.loop = true;
+          fallback.volume = Math.max(0, Math.min(1, volume != null ? volume : 0.8));
+          fallback.play().catch(function(err) {
+            console.warn('Audio play restricted:', err);
+          });
+          window.synveroFocusAudio = fallback;
+        });
+        window.synveroFocusAudio = audio;
+        return true;
+      } catch (e) {
+        console.error('Focus audio error:', e);
+        return false;
+      }
+    };
+
+    window.synveroStopFocusSound = function() {
+      try {
+        if (window.synveroFocusAudio) {
+          window.synveroFocusAudio.pause();
+          window.synveroFocusAudio.currentTime = 0;
+          window.synveroFocusAudio = null;
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    window.synveroSetFocusVolume = function(volume) {
+      try {
+        if (window.synveroFocusAudio) {
+          window.synveroFocusAudio.volume = Math.max(0, Math.min(1, volume));
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
