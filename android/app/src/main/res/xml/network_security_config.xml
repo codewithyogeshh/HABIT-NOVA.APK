@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Strictly block all unencrypted HTTP cleartext traffic to protect against MitM attacks -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <!-- Only trust verified device system certificates, blocking rogue proxy certs -->
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

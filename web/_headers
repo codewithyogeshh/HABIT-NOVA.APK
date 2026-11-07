@@ -5,6 +5,7 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: credentialless
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 /canvaskit/*
   Cache-Control: public, max-age=31536000, immutable
