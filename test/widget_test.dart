@@ -31,8 +31,8 @@ void main() {
     );
 
     // Verify that the app title is rendered.
-    expect(find.text('Synvero'), findsOneWidget);
-    expect(find.text('Everything Working in Sync.'), findsOneWidget);
+    expect(find.text('HabbitNova'), findsOneWidget);
+    expect(find.text('Small Steps • Big Changes'), findsOneWidget);
 
     // Verify the login form is present (should be exactly 2 TextFormFields for email and password)
     expect(find.byType(TextFormField), findsNWidgets(2));
@@ -78,11 +78,14 @@ void main() {
   });
 
   testWidgets('Tasks screen renders correctly', (WidgetTester tester) async {
+    SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(
       const MaterialApp(
         home: synvero_tasks.TasksScreen(),
       ),
     );
+    // Let the async task load finish before asserting.
+    await tester.pumpAndSettle();
 
     expect(find.text('Tasks'), findsAtLeast(1));
     expect(find.text('Today'), findsOneWidget);
@@ -139,7 +142,9 @@ void main() {
       ),
     );
 
-    // Tap on Appearance
+    // Scroll the Appearance tile into view, then tap it
+    await tester.ensureVisible(find.text('Appearance'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Appearance'));
     await tester.pumpAndSettle();
 
@@ -158,7 +163,9 @@ void main() {
       ),
     );
 
-    // Tap on Notification Settings
+    // Scroll the Notification Settings tile into view, then tap it
+    await tester.ensureVisible(find.text('Notification Settings'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Notification Settings'));
     await tester.pumpAndSettle();
 
@@ -178,7 +185,9 @@ void main() {
       ),
     );
 
-    // Tap on Home Screen Widget
+    // Scroll the Home Screen Widget tile into view, then tap it
+    await tester.ensureVisible(find.text('Home Screen Widget'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Home Screen Widget'));
     await tester.pumpAndSettle();
 
@@ -231,11 +240,13 @@ void main() {
     expect(find.byIcon(Icons.remove_circle_outline_rounded), findsOneWidget);
     expect(find.text('Set Focus Time'), findsOneWidget);
 
-    // Tap '+' stepper button (adds 5 mins)
-    await tester.tap(find.byIcon(Icons.add_circle_outline_rounded));
+    // Choose the 30-minute preset chip inside the sheet (exactly one ChoiceChip)
+    await tester.tap(find.widgetWithText(ChoiceChip, '30 min'));
     await tester.pumpAndSettle();
 
-    // Tap 'Set Focus Time' to confirm
+    // Ensure the confirm button is on-screen, then tap it
+    await tester.ensureVisible(find.text('Set Focus Time'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Set Focus Time'));
     await tester.pumpAndSettle();
 
@@ -304,7 +315,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify login screen is displayed
-    expect(find.text('Synvero'), findsOneWidget);
+    expect(find.text('HabbitNova'), findsOneWidget);
     expect(find.widgetWithText(ElevatedButton, 'Log In'), findsOneWidget);
   });
 
@@ -363,14 +374,18 @@ void main() {
     expect(find.text('Meditate'), findsOneWidget);
     expect(find.text('0/1 completed'), findsWidgets);
 
-    // Tap on Meditate to tick it
+    // Scroll Meditate into view, then tap to tick it
+    await tester.ensureVisible(find.text('Meditate'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Meditate'));
     await tester.pumpAndSettle();
 
     // Verify Meditate is now completed with '1/1 completed'
     expect(find.text('1/1 completed'), findsOneWidget);
 
-    // Tap on Meditate again to untick it
+    // Scroll Meditate into view again, then tap to untick it
+    await tester.ensureVisible(find.text('Meditate'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Meditate'));
     await tester.pumpAndSettle();
 
@@ -393,7 +408,7 @@ void main() {
       prompt: 'how to study ?',
       category: 'Study',
     );
-    expect(studyResponse.contains('Pomodoro'), isTrue);
+    expect(studyResponse.contains('Deep Focus Blocks'), isTrue);
     expect(studyResponse.contains('Active Recall'), isTrue);
     expect(studyResponse.contains('Feynman Technique'), isTrue);
 

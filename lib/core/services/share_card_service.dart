@@ -32,6 +32,11 @@ class ShareCardService {
     String title = 'Share Story to WhatsApp & Instagram',
   }) async {
     try {
+      if (kIsWeb) {
+        await shareText(caption, title: title);
+        return true;
+      }
+
       final tempDir = Directory.systemTemp;
       final cacheDir = Directory('${tempDir.path}/shared_images');
       if (!cacheDir.existsSync()) {

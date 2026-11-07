@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:synvero/core/navigation/app_navigator.dart';
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -73,7 +72,7 @@ class NotificationService {
 
   /// Starts the continuous native alarm audio and vibration loop
   static Future<void> startNativeAlarm() async {
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _alarmMethodChannel.invokeMethod('startAlarmRing');
     } catch (e) {
@@ -83,7 +82,7 @@ class NotificationService {
 
   /// Stops the continuous native alarm audio and vibration loop
   static Future<void> stopNativeAlarm() async {
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _alarmMethodChannel.invokeMethod('stopAlarmRing');
     } catch (e) {
@@ -159,7 +158,7 @@ class NotificationService {
       );
 
       // Create Android Notification Channels
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final androidImplementation = _notificationsPlugin
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
@@ -298,7 +297,7 @@ class NotificationService {
   static Future<bool> requestPermissions() async {
     try {
       if (kIsWeb) return true;
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final androidImplementation = _notificationsPlugin
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
@@ -323,7 +322,7 @@ class NotificationService {
   static Future<String> getPermissionStatus() async {
     try {
       if (kIsWeb) return 'granted';
-      if (Platform.isAndroid) {
+      if (defaultTargetPlatform == TargetPlatform.android) {
         final androidImplementation = _notificationsPlugin
             .resolvePlatformSpecificImplementation<
                 AndroidFlutterLocalNotificationsPlugin>();
@@ -963,7 +962,7 @@ class NotificationService {
 
   /// Checks OS active notifications and triggers in-app alarm dialog if an alarm is ringing.
   static Future<void> checkForActiveAlarms() async {
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       final android = _notificationsPlugin.resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin>();

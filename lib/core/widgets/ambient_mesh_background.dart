@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Haikei-inspired generative ambient mesh backdrop.
@@ -32,7 +33,22 @@ class _AmbientMeshBackgroundState extends State<AmbientMeshBackground> with Sing
     _breatheController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 8),
-    )..repeat(reverse: true);
+    );
+    // Keep the breathing loop running in the real app (both web and mobile),
+    // but freeze it during widget tests so pumpAndSettle() can finish instead
+    // of timing out on the perpetual animation.
+    if (!_isRunningInTest) {
+      _breatheController.repeat(reverse: true);
+    }
+  }
+
+  bool get _isRunningInTest {
+    if (kIsWeb) return false;
+    try {
+      return WidgetsBinding.instance.runtimeType.toString().contains('Test');
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

@@ -84,6 +84,7 @@ class LeaderboardService {
         path.startsWith('base64:')) {
       return path;
     }
+    if (kIsWeb) return 'assets/images/avatar_m1.png';
     try {
       final file = File(path);
       if (await file.exists()) {

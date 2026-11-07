@@ -346,7 +346,7 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Add your Google Gemini API Key to enable real-time generative AI that answers ANY question in the world, explains custom code, and generates detailed plans!',
+                'Real-time AI is powered through a secure backend proxy, so the key stays safe on the server — no setup needed. To use your own key directly instead (optional), paste it below.',
                 style: TextStyle(color: subtextColor, fontSize: 13, height: 1.4),
               ),
               const SizedBox(height: 16),

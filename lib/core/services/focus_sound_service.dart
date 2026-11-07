@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -60,7 +59,7 @@ class FocusSoundService {
   /// Plays the selected ambient sound
   static Future<void> playSound(String soundId) async {
     currentSoundIdNotifier.value = soundId;
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('playFocusSound', {
         'type': soundId,
@@ -74,7 +73,7 @@ class FocusSoundService {
   /// Stops any currently playing ambient sound
   static Future<void> stopSound() async {
     currentSoundIdNotifier.value = null;
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('stopFocusSound');
     } catch (e) {
@@ -85,7 +84,7 @@ class FocusSoundService {
   /// Updates volume level (0.0 to 1.0)
   static Future<void> setVolume(double vol) async {
     volumeNotifier.value = vol.clamp(0.0, 1.0);
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
     try {
       await _channel.invokeMethod('setFocusVolume', {
         'volume': volumeNotifier.value,

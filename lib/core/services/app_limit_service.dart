@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 
 import 'package:flutter/services.dart';
@@ -180,7 +178,7 @@ class AppLimitService {
 
   static Future<bool> hasUsagePermission() async {
 
-    if (kIsWeb || !Platform.isAndroid) return true;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
 
     try {
 
@@ -202,7 +200,7 @@ class AppLimitService {
 
   static Future<void> requestUsagePermission() async {
 
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
     try {
 
@@ -218,7 +216,7 @@ class AppLimitService {
 
   static Future<bool> hasAccessibilityPermission() async {
 
-    if (kIsWeb || !Platform.isAndroid) return true;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return true;
 
     try {
 
@@ -240,7 +238,7 @@ class AppLimitService {
 
   static Future<void> requestAccessibilityPermission() async {
 
-    if (kIsWeb || !Platform.isAndroid) return;
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
     try {
 
@@ -258,7 +256,7 @@ class AppLimitService {
 
     ensureHandler();
 
-    if (kIsWeb || !Platform.isAndroid) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
 
       return _getFallbackScreenTime();
 
@@ -292,7 +290,7 @@ class AppLimitService {
 
     ensureHandler();
 
-    if (kIsWeb || !Platform.isAndroid) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
 
       return _getFallbackScreenTime();
 
@@ -332,7 +330,7 @@ class AppLimitService {
 
     ensureHandler();
 
-    if (kIsWeb || !Platform.isAndroid) {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
 
       return _getFallbackDataUsage();
 
@@ -434,7 +432,7 @@ class AppLimitService {
 
 
 
-      if (!kIsWeb && Platform.isAndroid) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
 
         await _channel.invokeMethod('setAppLimit', {
 
@@ -480,7 +478,7 @@ class AppLimitService {
 
 
 
-      if (!kIsWeb && Platform.isAndroid) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
 
         await _channel.invokeMethod('removeAppLimit', {
 
@@ -510,7 +508,7 @@ class AppLimitService {
 
     try {
 
-      if (!kIsWeb && Platform.isAndroid) {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
 
         try {
 

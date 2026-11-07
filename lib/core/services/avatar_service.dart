@@ -125,15 +125,18 @@ class AvatarService {
 
       if (savedAvatar != null && savedAvatar.isNotEmpty) {
         // Validate local file if applicable (don't reject base64 or assets/urls)
-        if (!savedAvatar.startsWith('assets/') &&
+        if (!kIsWeb &&
+            !savedAvatar.startsWith('assets/') &&
             !savedAvatar.startsWith('http') &&
             !savedAvatar.startsWith('data:image/') &&
             !savedAvatar.startsWith('base64:')) {
-          if (!File(savedAvatar).existsSync()) {
-            currentAvatarNotifier.value =
-                savedGender == 'female' ? defaultFemaleAvatar : defaultMaleAvatar;
-            return;
-          }
+          try {
+            if (!File(savedAvatar).existsSync()) {
+              currentAvatarNotifier.value =
+                  savedGender == 'female' ? defaultFemaleAvatar : defaultMaleAvatar;
+              return;
+            }
+          } catch (_) {}
         }
         currentAvatarNotifier.value = savedAvatar;
       } else {

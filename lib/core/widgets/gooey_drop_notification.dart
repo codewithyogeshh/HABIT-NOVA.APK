@@ -16,8 +16,8 @@ enum GooeyNotificationType {
 ///
 /// Animation Choreography:
 /// 1. Drop Detachment: A glowing molten viscous droplet detaches from the top notch/island.
-/// 2. Fluid Fall & Elongation: Accelerates downwards while stretching vertically (`scaleY: 1.5, scaleX: 0.75`).
-/// 3. Impact & Splat: Hits the landing spot, squashing flat (`scaleY: 0.45, scaleX: 1.7`) with tactile impact.
+/// 2. Fluid Fall & Elongation: Accelerates downwards while stretching vertically (`scaleY: 1.48, scaleX: 0.72`).
+/// 3. Impact & Splat: Hits the landing spot, squashing flat (`scaleY: 0.45, scaleX: 1.75`) with tactile impact.
 /// 4. Melt & Spread: The squashed droplet fluidly melts and spreads outwards into a full frosted-glass toast!
 /// 5. Content Reveal: Fluid specular gloss sweeps across the top edge and content smoothly settles into place.
 class GooeyNotification {
@@ -47,10 +47,7 @@ class GooeyNotification {
         message: message,
         icon: icon ?? _getDefaultIcon(type),
         type: type,
-        onTap: () {
-          _dismissCurrent();
-          onTap?.call();
-        },
+        onTap: onTap,
         onDismiss: () => _dismissCurrent(),
       ),
     );
@@ -93,7 +90,7 @@ class _GooeyDropNotificationWidget extends StatefulWidget {
   final String message;
   final IconData icon;
   final GooeyNotificationType type;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback onDismiss;
 
   const _GooeyDropNotificationWidget({
@@ -101,7 +98,7 @@ class _GooeyDropNotificationWidget extends StatefulWidget {
     required this.message,
     required this.icon,
     required this.type,
-    required this.onTap,
+    this.onTap,
     required this.onDismiss,
   });
 
@@ -182,6 +179,12 @@ class _GooeyDropNotificationWidgetState
     });
   }
 
+  void _handleToastTap() {
+    if (_isExiting) return;
+    _dismissWithAnimation();
+    widget.onTap?.call();
+  }
+
   Color _getPrimaryColor() {
     switch (widget.type) {
       case GooeyNotificationType.streak:
@@ -212,311 +215,322 @@ class _GooeyDropNotificationWidgetState
       top: 0,
       left: 0,
       right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, child) {
-            final t = _controller.value;
-            final fallT = _fallAnimation.value;
-            final splatT = _splatAnimation.value;
-            final spreadT = _spreadAnimation.value;
-            final contentT = _contentAnimation.value;
+      child: Material(
+        type: MaterialType.transparency,
+        child: SafeArea(
+          bottom: false,
+          child: AnimatedBuilder(
+            animation: _controller,
+            builder: (context, child) {
+              final t = _controller.value;
+              final fallT = _fallAnimation.value;
+              final splatT = _splatAnimation.value;
+              final spreadT = _spreadAnimation.value;
+              final contentT = _contentAnimation.value;
 
-            // --- Y Position Computation ---
-            // From -45 (above screen / notch) down to restingTop
-            final dropY = lerpDouble(-45.0, restingTop, fallT)! + _dragOffsetY;
+              // --- Y Position Computation ---
+              // Uses Transform.translate so negative values NEVER trigger assertion errors
+              final dropY = lerpDouble(-55.0, restingTop, fallT)! + _dragOffsetY;
 
-            // --- Molten Droplet Geometry & Morph ---
-            // When falling: droplet stretches along Y axis (elongates)
-            // At impact: squashes flat along Y axis, expands along X axis
-            // When spreading: smoothly morphs from squashed droplet into full toast!
-            double currentWidth;
-            double currentHeight;
-            double currentRadius;
+              // --- Molten Droplet Geometry & Morph ---
+              double currentWidth;
+              double currentHeight;
+              double currentRadius;
 
-            if (t <= 0.48) {
-              // Droplet falling and impacting
-              final stretchY = lerpDouble(1.0, 1.48, fallT)!;
-              final thinX = lerpDouble(1.0, 0.72, fallT)!;
+              if (t <= 0.48) {
+                // Droplet falling and impacting
+                final stretchY = lerpDouble(1.0, 1.48, fallT)!;
+                final thinX = lerpDouble(1.0, 0.72, fallT)!;
 
-              final impactSquashY = lerpDouble(1.0, 0.45, splatT)!;
-              final impactExpandX = lerpDouble(1.0, 1.75, splatT)!;
+                final impactSquashY = lerpDouble(1.0, 0.45, splatT)!;
+                final impactExpandX = lerpDouble(1.0, 1.75, splatT)!;
 
-              currentWidth = initialDropSize * thinX * impactExpandX;
-              currentHeight = initialDropSize * stretchY * impactSquashY;
-              currentRadius = currentHeight / 2;
-            } else {
-              // Melting & spreading out into toast
-              final squashedWidth = initialDropSize * 0.72 * 1.75; // ~43dp
-              final squashedHeight = initialDropSize * 1.48 * 0.45; // ~23dp
+                currentWidth = initialDropSize * thinX * impactExpandX;
+                currentHeight = initialDropSize * stretchY * impactSquashY;
+                currentRadius = currentHeight / 2;
+              } else {
+                // Melting & spreading out into toast
+                final squashedWidth = initialDropSize * 0.72 * 1.75; // ~43dp
+                final squashedHeight = initialDropSize * 1.48 * 0.45; // ~23dp
 
-              currentWidth = lerpDouble(squashedWidth, targetToastWidth, spreadT)!;
-              currentHeight = lerpDouble(squashedHeight, targetToastHeight, spreadT)!;
-              currentRadius = lerpDouble(squashedHeight / 2, 24.0, spreadT)!;
-            }
+                currentWidth = lerpDouble(squashedWidth, targetToastWidth, spreadT)!;
+                currentHeight = lerpDouble(squashedHeight, targetToastHeight, spreadT)!;
+                currentRadius = lerpDouble(squashedHeight / 2, 24.0, spreadT)!;
+              }
 
-            final isToastMelted = spreadT > 0.40;
+              final isToastMelted = spreadT > 0.40;
 
-            return Align(
-              alignment: Alignment.topCenter,
-              child: Container(
-                margin: EdgeInsets.only(top: dropY),
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    // --- Molten Liquid Stem Painter (Trailing trail from notch) ---
-                    if (fallT > 0.05 && fallT < 0.95 && !_isExiting)
-                      Positioned(
-                        top: -restingTop - 20,
-                        left: 0,
-                        right: 0,
-                        height: restingTop + 25,
-                        child: CustomPaint(
-                          painter: _ViscousStemPainter(
-                            progress: fallT,
-                            color: primaryColor,
+              return Align(
+                alignment: Alignment.topCenter,
+                child: Transform.translate(
+                  offset: Offset(0, dropY),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      // --- Molten Liquid Stem Painter (Trailing trail from notch) ---
+                      if (fallT > 0.05 && fallT < 0.95 && !_isExiting)
+                        Positioned(
+                          top: -restingTop - 20,
+                          left: 0,
+                          right: 0,
+                          height: restingTop + 25,
+                          child: CustomPaint(
+                            painter: _ViscousStemPainter(
+                              progress: fallT,
+                              color: primaryColor,
+                            ),
                           ),
                         ),
-                      ),
 
-                    // --- The Morphing Droplet / Toast ---
-                    GestureDetector(
-                      onVerticalDragUpdate: (details) {
-                        if (details.primaryDelta != null && details.primaryDelta! < 0) {
-                          setState(() {
-                            _dragOffsetY += details.primaryDelta!;
-                          });
-                          if (_dragOffsetY < -30) {
-                            _dismissWithAnimation();
+                      // --- The Morphing Droplet / Toast ---
+                      GestureDetector(
+                        onVerticalDragUpdate: (details) {
+                          if (details.primaryDelta != null && details.primaryDelta! < 0) {
+                            setState(() {
+                              _dragOffsetY += details.primaryDelta!;
+                            });
+                            if (_dragOffsetY < -30) {
+                              _dismissWithAnimation();
+                            }
                           }
-                        }
-                      },
-                      onVerticalDragEnd: (_) {
-                        if (_dragOffsetY < -15) {
-                          _dismissWithAnimation();
-                        } else {
-                          setState(() => _dragOffsetY = 0.0);
-                        }
-                      },
-                      onTap: isToastMelted ? widget.onTap : null,
-                      child: Container(
-                        width: currentWidth,
-                        height: currentHeight,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(currentRadius),
-                          boxShadow: [
-                            BoxShadow(
-                              color: primaryColor.withValues(
-                                alpha: lerpDouble(0.40, 0.22, spreadT)!,
-                              ),
-                              blurRadius: lerpDouble(14.0, 26.0, spreadT)!,
-                              spreadRadius: lerpDouble(2.0, 1.0, spreadT)!,
-                              offset: Offset(0, lerpDouble(3.0, 8.0, spreadT)!),
-                            ),
-                            if (isToastMelted)
+                        },
+                        onVerticalDragEnd: (_) {
+                          if (_dragOffsetY < -15) {
+                            _dismissWithAnimation();
+                          } else {
+                            setState(() => _dragOffsetY = 0.0);
+                          }
+                        },
+                        onTap: isToastMelted ? _handleToastTap : null,
+                        child: Container(
+                          width: currentWidth,
+                          height: currentHeight,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(currentRadius),
+                            boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.45 * spreadT),
-                                blurRadius: 18,
-                                offset: const Offset(0, 4),
-                              ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(currentRadius),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(
-                              sigmaX: 20 * spreadT.clamp(0.01, 1.0),
-                              sigmaY: 20 * spreadT.clamp(0.01, 1.0),
-                            ),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Color.lerp(
-                                  primaryColor.withValues(alpha: 0.85),
-                                  const Color(0xFF071424).withValues(alpha: 0.92),
-                                  spreadT,
+                                color: primaryColor.withValues(
+                                  alpha: (lerpDouble(0.40, 0.22, spreadT) ?? 0.3).clamp(0.0, 1.0),
                                 ),
-                                borderRadius: BorderRadius.circular(currentRadius),
-                                border: Border.all(
-                                  color: primaryColor.withValues(
-                                    alpha: lerpDouble(0.85, 0.55, spreadT)!,
+                                blurRadius: lerpDouble(14.0, 26.0, spreadT) ?? 20.0,
+                                spreadRadius: lerpDouble(2.0, 1.0, spreadT) ?? 1.0,
+                                offset: Offset(0, lerpDouble(3.0, 8.0, spreadT) ?? 5.0),
+                              ),
+                              if (isToastMelted)
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: (0.45 * spreadT).clamp(0.0, 1.0)),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 4),
+                                ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(currentRadius),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(
+                                sigmaX: 20 * spreadT.clamp(0.01, 1.0),
+                                sigmaY: 20 * spreadT.clamp(0.01, 1.0),
+                              ),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Color.lerp(
+                                    primaryColor.withValues(alpha: 0.85),
+                                    const Color(0xFF071424).withValues(alpha: 0.92),
+                                    spreadT,
                                   ),
-                                  width: lerpDouble(1.8, 1.3, spreadT)!,
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  // Molten Droplet Center Glow (Fades as it spreads)
-                                  if (spreadT < 0.6)
-                                    Center(
-                                      child: Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: Colors.white.withValues(
-                                            alpha: (1.0 - spreadT / 0.6) * 0.7,
-                                          ),
-                                        ),
-                                      ),
+                                  borderRadius: BorderRadius.circular(currentRadius),
+                                  border: Border.all(
+                                    color: primaryColor.withValues(
+                                      alpha: (lerpDouble(0.85, 0.55, spreadT) ?? 0.6).clamp(0.0, 1.0),
                                     ),
-
-                                  // Top Liquid Specular Arc (Surface tension gloss)
-                                  if (spreadT > 0.3)
-                                    Positioned(
-                                      top: 0,
-                                      left: 20,
-                                      right: 20,
-                                      height: 1.5,
-                                      child: Opacity(
-                                        opacity: spreadT,
+                                    width: lerpDouble(1.8, 1.3, spreadT) ?? 1.4,
+                                  ),
+                                ),
+                                child: Stack(
+                                  children: [
+                                    // Molten Droplet Center Glow (Fades as it spreads)
+                                    if (spreadT < 0.6)
+                                      Center(
                                         child: Container(
+                                          width: 16,
+                                          height: 16,
                                           decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Colors.white.withValues(alpha: 0.0),
-                                                Colors.white.withValues(alpha: 0.8),
-                                                Colors.white.withValues(alpha: 0.0),
-                                              ],
+                                            shape: BoxShape.circle,
+                                            color: Colors.white.withValues(
+                                              alpha: ((1.0 - spreadT / 0.6) * 0.7).clamp(0.0, 1.0),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
 
-                                  // Inner Toast Content (Revealed as droplet melts & spreads)
-                                  if (contentT > 0.05)
-                                    Opacity(
-                                      opacity: contentT,
-                                      child: Transform.translate(
-                                        offset: Offset(0, 6.0 * (1.0 - contentT)),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 14, vertical: 11),
-                                          child: Row(
-                                            children: [
-                                              // Liquid Icon Pod
-                                              Container(
-                                                width: 40,
-                                                height: 40,
-                                                decoration: BoxDecoration(
-                                                  gradient: LinearGradient(
-                                                    colors: [
-                                                      primaryColor.withValues(alpha: 0.35),
-                                                      primaryColor.withValues(alpha: 0.12),
-                                                    ],
-                                                    begin: Alignment.topLeft,
-                                                    end: Alignment.bottomRight,
-                                                  ),
-                                                  shape: BoxShape.circle,
-                                                  border: Border.all(
-                                                    color: primaryColor.withValues(alpha: 0.65),
-                                                    width: 1.4,
-                                                  ),
-                                                ),
-                                                child: Icon(
-                                                  widget.icon,
-                                                  color: primaryColor,
-                                                  size: 20,
-                                                ),
+                                    // Top Liquid Specular Arc (Surface tension gloss)
+                                    if (spreadT > 0.3)
+                                      Positioned(
+                                        top: 0,
+                                        left: 20,
+                                        right: 20,
+                                        height: 1.5,
+                                        child: Opacity(
+                                          opacity: spreadT.clamp(0.0, 1.0),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.white.withValues(alpha: 0.0),
+                                                  Colors.white.withValues(alpha: 0.8),
+                                                  Colors.white.withValues(alpha: 0.0),
+                                                ],
                                               ),
-                                              const SizedBox(width: 12),
-
-                                              // Titles & Microcopy
-                                              Expanded(
-                                                child: Column(
-                                                  mainAxisSize: MainAxisSize.min,
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Row(
-                                                      children: [
-                                                        Expanded(
-                                                          child: Text(
-                                                            widget.title,
-                                                            style: const TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 14,
-                                                              fontWeight: FontWeight.w800,
-                                                              letterSpacing: -0.2,
-                                                            ),
-                                                            maxLines: 1,
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                        ),
-                                                        Container(
-                                                          padding: const EdgeInsets.symmetric(
-                                                              horizontal: 6, vertical: 1.5),
-                                                          decoration: BoxDecoration(
-                                                            color: primaryColor.withValues(alpha: 0.16),
-                                                            borderRadius: BorderRadius.circular(6),
-                                                            border: Border.all(
-                                                              color: primaryColor.withValues(alpha: 0.35),
-                                                            ),
-                                                          ),
-                                                          child: Text(
-                                                            'NOW',
-                                                            style: TextStyle(
-                                                              color: primaryColor,
-                                                              fontSize: 9,
-                                                              fontWeight: FontWeight.w800,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      widget.message,
-                                                      style: TextStyle(
-                                                        color: Colors.white.withValues(alpha: 0.82),
-                                                        fontSize: 12,
-                                                        height: 1.25,
-                                                      ),
-                                                      maxLines: 1,
-                                                      overflow: TextOverflow.ellipsis,
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-
-                                              const SizedBox(width: 6),
-
-                                              // Close pill
-                                              GestureDetector(
-                                                onTap: _dismissWithAnimation,
-                                                behavior: HitTestBehavior.opaque,
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(5),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white.withValues(alpha: 0.08),
-                                                    shape: BoxShape.circle,
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.close_rounded,
-                                                    size: 13,
-                                                    color: Colors.white.withValues(alpha: 0.6),
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                ],
+
+                                    // Inner Toast Content (Revealed as droplet melts & spreads)
+                                    if (contentT > 0.05 && spreadT > 0.35)
+                                      Opacity(
+                                        opacity: contentT.clamp(0.0, 1.0),
+                                        child: OverflowBox(
+                                          minWidth: 0,
+                                          maxWidth: targetToastWidth,
+                                          minHeight: 0,
+                                          maxHeight: targetToastHeight,
+                                          alignment: Alignment.center,
+                                          child: SizedBox(
+                                            width: targetToastWidth,
+                                            height: targetToastHeight,
+                                            child: Padding(
+                                              padding: const EdgeInsets.symmetric(
+                                                  horizontal: 14, vertical: 11),
+                                              child: Row(
+                                                children: [
+                                                  // Liquid Icon Pod
+                                                  Container(
+                                                    width: 40,
+                                                    height: 40,
+                                                    decoration: BoxDecoration(
+                                                      gradient: LinearGradient(
+                                                        colors: [
+                                                          primaryColor.withValues(alpha: 0.35),
+                                                          primaryColor.withValues(alpha: 0.12),
+                                                        ],
+                                                        begin: Alignment.topLeft,
+                                                        end: Alignment.bottomRight,
+                                                      ),
+                                                      shape: BoxShape.circle,
+                                                      border: Border.all(
+                                                        color: primaryColor.withValues(alpha: 0.65),
+                                                        width: 1.4,
+                                                      ),
+                                                    ),
+                                                    child: Icon(
+                                                      widget.icon,
+                                                      color: primaryColor,
+                                                      size: 20,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+
+                                                  // Titles & Microcopy
+                                                  Expanded(
+                                                    child: Column(
+                                                      mainAxisSize: MainAxisSize.min,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment.start,
+                                                      children: [
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: Text(
+                                                                widget.title,
+                                                                style: const TextStyle(
+                                                                  color: Colors.white,
+                                                                  fontSize: 14,
+                                                                  fontWeight: FontWeight.w800,
+                                                                  letterSpacing: -0.2,
+                                                                  decoration: TextDecoration.none,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(
+                                                                  horizontal: 6, vertical: 1.5),
+                                                              decoration: BoxDecoration(
+                                                                color: primaryColor.withValues(alpha: 0.16),
+                                                                borderRadius: BorderRadius.circular(6),
+                                                                border: Border.all(
+                                                                  color: primaryColor.withValues(alpha: 0.35),
+                                                                ),
+                                                              ),
+                                                              child: Text(
+                                                                'NOW',
+                                                                style: TextStyle(
+                                                                  color: primaryColor,
+                                                                  fontSize: 9,
+                                                                  fontWeight: FontWeight.w800,
+                                                                  decoration: TextDecoration.none,
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                        const SizedBox(height: 2),
+                                                        Text(
+                                                          widget.message,
+                                                          style: TextStyle(
+                                                            color: Colors.white.withValues(alpha: 0.82),
+                                                            fontSize: 12,
+                                                            height: 1.25,
+                                                            decoration: TextDecoration.none,
+                                                          ),
+                                                          maxLines: 1,
+                                                          overflow: TextOverflow.ellipsis,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+
+                                                  const SizedBox(width: 6),
+
+                                                  // Close pill
+                                                  GestureDetector(
+                                                    onTap: _dismissWithAnimation,
+                                                    behavior: HitTestBehavior.opaque,
+                                                    child: Container(
+                                                      padding: const EdgeInsets.all(5),
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.white.withValues(alpha: 0.08),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                      child: Icon(
+                                                        Icons.close_rounded,
+                                                        size: 13,
+                                                        color: Colors.white.withValues(alpha: 0.6),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -535,7 +549,7 @@ class _ViscousStemPainter extends CustomPainter {
     if (progress > 0.85) return;
 
     final normT = (progress / 0.85).clamp(0.0, 1.0);
-    final opacity = (1.0 - normT) * 0.50;
+    final opacity = ((1.0 - normT) * 0.50).clamp(0.0, 1.0);
 
     final paint = Paint()
       ..color = color.withValues(alpha: opacity)

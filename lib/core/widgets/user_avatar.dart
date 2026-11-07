@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 
@@ -135,18 +136,22 @@ class UserAvatar extends StatelessWidget {
         fit: BoxFit.cover,
         errorBuilder: (context, error, stackTrace) => _buildFallbackAsset(),
       );
+    } else if (!kIsWeb) {
+      // Local file (mobile/desktop only)
+      try {
+        final file = File(path);
+        if (file.existsSync()) {
+          return Image.file(
+            file,
+            width: size,
+            height: size,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => _buildFallbackAsset(),
+          );
+        }
+      } catch (_) {}
+      return _buildFallbackAsset();
     } else {
-      // Local file
-      final file = File(path);
-      if (file.existsSync()) {
-        return Image.file(
-          file,
-          width: size,
-          height: size,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildFallbackAsset(),
-        );
-      }
       return _buildFallbackAsset();
     }
   }
