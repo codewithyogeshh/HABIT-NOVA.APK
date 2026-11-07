@@ -19,8 +19,7 @@ flutter pub get
 echo "=== Building Flutter Web (Release) ==="
 flutter build web --release
 
-echo "=== Copying SPA Routing & Performance Headers ==="
-cp web/_redirects build/web/_redirects 2>/dev/null || true
+echo "=== Copying Performance & Security Headers ==="
 cp web/_headers build/web/_headers 2>/dev/null || true
 
 echo "=== Verifying Build Output ==="

@@ -10,13 +10,12 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-# Ensure Cloudflare Pages routing & header files are present in build/web
-Copy-Item -Path "web\_redirects" -Destination "build\web\_redirects" -Force
+# Ensure Cloudflare security headers are present in build/web
 Copy-Item -Path "web\_headers" -Destination "build\web\_headers" -Force
 
 Write-Host "==========================================" -ForegroundColor Green
-Write-Host " Build succeeded! Deploying to Cloudflare Pages... " -ForegroundColor Yellow
+Write-Host " Build succeeded! Deploying to Cloudflare... " -ForegroundColor Yellow
 Write-Host "==========================================" -ForegroundColor Green
 
-npx wrangler pages deploy build/web --project-name habitnova
+npx wrangler deploy
 
