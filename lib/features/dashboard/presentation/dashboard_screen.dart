@@ -7,6 +7,7 @@ import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
 import 'package:synvero/core/services/streak_freeze_service.dart';
+import 'package:synvero/core/services/streak_risk_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/widgets/streak_freeze_card.dart';
 import 'package:flutter/material.dart';
@@ -245,6 +246,17 @@ class _DashboardScreenState extends State<DashboardScreen>
       );
       _streakDays = savedStreak > 0 ? savedStreak : (completed > 0 ? 1 : 0);
 
+      // Keep exactly one streak-at-risk nudge pending for today, timed from
+      // this user's own completion history. Fire-and-forget: planning touches
+      // the OS scheduler and must never hold up the dashboard's first paint.
+      unawaited(
+        StreakRiskReminderService.refreshForToday(
+          userId: currentUserId,
+          remainingHabits: (defaultHabitIds.length - completed).clamp(0, 99),
+          streakDays: _streakDays,
+        ),
+      );
+
       final xp = await GamificationService.loadXP(userId: currentUserId);
       _totalXP = xp;
 
@@ -326,6 +338,14 @@ class _DashboardScreenState extends State<DashboardScreen>
       }
       AppWidgetService.syncWidget();
       SquadService.syncMyLiveProgressToAllSquads();
+      // A completion changes what is left, so re-time today's nudge.
+      unawaited(
+        StreakRiskReminderService.refreshForToday(
+          userId: currentUserId,
+          remainingHabits: (5 - _completedHabitsCount).clamp(0, 99),
+          streakDays: _streakDays,
+        ),
+      );
     } catch (_) {}
 
     if (mounted) {

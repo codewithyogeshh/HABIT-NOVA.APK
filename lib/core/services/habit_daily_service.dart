@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/squad_service.dart';
 import 'package:synvero/core/services/streak_freeze_service.dart';
+import 'package:synvero/core/services/streak_risk_service.dart';
 
 /// Service responsible for managing daily habit states and automatic midnight (12:00 AM) resets.
 ///
@@ -112,6 +113,9 @@ class HabitDailyService {
         );
         // Count today once towards the streak (idempotent per day).
         await StreakFreezeService.recordCompletionDay(userId: userId);
+        // Learn when this user actually finishes so the nudge lands at their
+        // own time rather than a fixed hour.
+        await StreakRiskReminderService.recordCompletionMoment(userId: userId);
       } else {
         await prefs.remove(_completedAtKey(userId, habitId));
       }
