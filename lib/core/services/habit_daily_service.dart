@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:synvero/core/services/app_widget_service.dart';
 import 'package:synvero/core/services/squad_service.dart';
+import 'package:synvero/core/services/streak_freeze_service.dart';
 
 /// Service responsible for managing daily habit states and automatic midnight (12:00 AM) resets.
 ///
@@ -26,6 +27,38 @@ class HabitDailyService {
 
   static String _streakKey(String userId) {
     return 'user_${userId}_streak_days';
+  }
+
+  static String _completedAtKey(String userId, String habitId) {
+    return 'user_${userId}_habit_${habitId}_completed_at';
+  }
+
+  /// How long a completed habit stays locked from being un-ticked.
+  static const Duration completionLockDuration = Duration(hours: 24);
+
+  /// When the habit was ticked (null when never completed / already undone).
+  static Future<DateTime?> habitCompletedAt(String userId, String habitId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_completedAtKey(userId, habitId));
+      return raw == null ? null : DateTime.tryParse(raw);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when the habit was completed less than [completionLockDuration] ago.
+  ///
+  /// While locked the check can't be removed, so a user cannot un-tick and
+  /// re-tick to farm XP from the same completion.
+  static Future<bool> isHabitLocked(String userId, String habitId) async {
+    final completedAt = await habitCompletedAt(userId, habitId);
+    if (completedAt != null) {
+      return DateTime.now().difference(completedAt) < completionLockDuration;
+    }
+    // Habits completed before this lock existed carry no timestamp; a
+    // completion recorded for today still counts as "within 24 hours".
+    return isHabitCompletedToday(userId, habitId);
   }
 
   /// Checks if a default/local habit is completed today.
@@ -71,6 +104,18 @@ class HabitDailyService {
       await prefs.setBool(todayKey, isCompleted);
       await prefs.setString(_lastActiveDateKey(userId), todayStr);
 
+      // Remember the exact completion moment so unticking can be locked for 24h.
+      if (isCompleted) {
+        await prefs.setString(
+          _completedAtKey(userId, habitId),
+          DateTime.now().toIso8601String(),
+        );
+        // Count today once towards the streak (idempotent per day).
+        await StreakFreezeService.recordCompletionDay(userId: userId);
+      } else {
+        await prefs.remove(_completedAtKey(userId, habitId));
+      }
+
       // Keep legacy key in sync for backwards compatibility
       final legacyKey = 'user_${userId}_habit_${habitId}_completed';
       await prefs.setBool(legacyKey, isCompleted);
@@ -104,10 +149,25 @@ class HabitDailyService {
 
         final yesterdayStr = getYesterdayDateStr();
 
-        // If last active date was yesterday, streak is eligible to continue.
-        // If last active was older than yesterday, the user missed a day -> reset streak.
-        if (lastDate != yesterdayStr) {
+        // Bank this week's free freeze before the missed days are evaluated.
+        await StreakFreezeService.grantWeeklyFreezeIfDue(userId: userId);
+
+        // A missed day is first covered by a banked freeze. The streak only
+        // breaks when the whole gap cannot be covered, so one freeze is never
+        // silently wasted on a longer absence.
+        final missedDays =
+            await StreakFreezeService.missedDays(userId: userId);
+        final coveredDays = missedDays > 0
+            ? await StreakFreezeService.applyMissedDayFreeze(userId: userId)
+            : 0;
+
+        if (missedDays > 0 && coveredDays == 0) {
           await prefs.setInt(_streakKey(userId), 0);
+          await prefs.setInt('app_streak_days', 0);
+        } else if (coveredDays > 0) {
+          // The frozen days count as active, so the same gap is not charged
+          // again on the next rollover.
+          await prefs.setString(_lastActiveDateKey(userId), yesterdayStr);
         }
 
         // Clean legacy habit completed keys so fallback screens don't read yesterday's state

@@ -31,6 +31,8 @@ import 'package:synvero/features/squads/presentation/squads_screen.dart';
 
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/app_limit_service.dart';
+import 'package:synvero/core/services/app_update_service.dart';
+import 'package:synvero/core/widgets/app_update_overlay.dart';
 
 void main() async {
   // Ensure Flutter binding is initialized before using platform channels
@@ -110,6 +112,11 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
     AppLimitService.ensureHandler();
     AppLimitService.blockedAppEventNotifier.addListener(_handleBlockedAppEvent);
     AdCreditService.initialize();
+    // Non-blocking check for a newer published build (Android APK distribution).
+    Future<void>.delayed(
+      const Duration(seconds: 3),
+      AppUpdateService.checkForUpdate,
+    );
   }
 
   void _handleBlockedAppEvent() {
@@ -132,6 +139,7 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       NotificationService.checkForActiveAlarms();
+      AppUpdateService.checkForUpdate();
     }
   }
 
@@ -162,6 +170,7 @@ class _SynveroAppState extends State<SynveroApp> with WidgetsBindingObserver {
                   return Stack(
                     children: [
                       ?child,
+                      const AppUpdateOverlay(),
                       if (activeAlarm != null)
                         AlarmRingingDialog(alarm: activeAlarm),
                     ],

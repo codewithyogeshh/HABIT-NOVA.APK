@@ -73,6 +73,12 @@ class _MainAppShellState extends State<MainAppShell>
       _currentIndex = index;
     });
 
+    // Honour the OS "remove animations" accessibility setting.
+    if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+      _gooeyTransitionController.value = 1.0;
+      return;
+    }
+
     _gooeyTransitionController.forward(from: 0.0);
   }
 
@@ -98,7 +104,9 @@ class _MainAppShellState extends State<MainAppShell>
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark
+          ? const Color(0xFF030814)
+          : const Color(0xFFF8FAFC),
       extendBody: true,
       body: AnimatedBuilder(
         animation: _gooeyAnimation,
@@ -143,42 +151,50 @@ class _MainAppShellState extends State<MainAppShell>
         },
       ),
 
-      // Exactly ONE Persistent Sliding Pill Nav Bar across all screens
+      // Exactly ONE Persistent Sliding Pill Nav Bar across all screens.
+      // Capped and centred so it stays a compact pill on tablets/desktop
+      // instead of stretching edge to edge.
       bottomNavigationBar: SafeArea(
-        child: SlidingPillNavBar(
-          currentIndex: _currentIndex,
-          isDark: isDark,
-          onTap: selectTab,
-          items: const [
-            SlidingPillItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Home',
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: SlidingPillNavBar(
+              currentIndex: _currentIndex,
+              isDark: isDark,
+              onTap: selectTab,
+              items: const [
+                SlidingPillItem(
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  label: 'Home',
+                ),
+                SlidingPillItem(
+                  icon: Icons.calendar_today_outlined,
+                  activeIcon: Icons.calendar_month_rounded,
+                  label: 'Habits',
+                ),
+                SlidingPillItem(
+                  icon: Icons.timer_outlined,
+                  activeIcon: Icons.timer_rounded,
+                  label: 'Timer',
+                ),
+                SlidingPillItem(
+                  icon: Icons.checklist_rounded,
+                  activeIcon: Icons.task_alt_rounded,
+                  label: 'Tasks',
+                ),
+                SlidingPillItem(
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Profile',
+                ),
+              ],
             ),
-            SlidingPillItem(
-              icon: Icons.calendar_today_outlined,
-              activeIcon: Icons.calendar_month_rounded,
-              label: 'Habits',
-            ),
-            SlidingPillItem(
-              icon: Icons.timer_outlined,
-              activeIcon: Icons.timer_rounded,
-              label: 'Timer',
-            ),
-            SlidingPillItem(
-              icon: Icons.checklist_rounded,
-              activeIcon: Icons.task_alt_rounded,
-              label: 'Tasks',
-            ),
-            SlidingPillItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
-

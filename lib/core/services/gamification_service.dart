@@ -65,6 +65,9 @@ class GamificationService {
 
   static String get _currentUserId => SupabaseService.user?.id ?? 'guest';
 
+  /// Public view of the account whose XP/local progress is being read.
+  static String get currentUserId => _currentUserId;
+
   /// All available badges in HabbitNova
   static const List<HabbitBadge> allBadges = [
     HabbitBadge(
@@ -232,6 +235,60 @@ class GamificationService {
       return leveledUp;
     } catch (e) {
       debugPrint('GamificationService.addXP error: $e');
+      return false;
+    }
+  }
+
+  /// Spends XP (e.g. buying a Streak Freeze) without ever going negative.
+  ///
+  /// This is the only way XP leaves the account, so it cannot be combined with
+  /// [addXPOnce] to farm points: a purchase always lowers the balance.
+  static Future<bool> spendXP(
+    int amount, {
+    String? userId,
+    required String reason,
+  }) async {
+    if (amount <= 0) return false;
+    final uid = userId ?? _currentUserId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final currentXP = prefs.getInt(_xpKey(uid)) ?? 150;
+      if (currentXP < amount) return false;
+
+      final newXP = currentXP - amount;
+      await prefs.setInt(_xpKey(uid), newXP);
+      totalXPNotifier.value = newXP;
+
+      debugPrint('GamificationService.spendXP: -$amount XP ($reason)');
+      LeaderboardService.syncCurrentUser(xp: newXP);
+      return true;
+    } catch (e) {
+      debugPrint('GamificationService.spendXP error: $e');
+      return false;
+    }
+  }
+
+  /// Awards XP at most once per [actionKey] (e.g. one habit on one day).
+  ///
+  /// Guards against point farming: un-ticking and re-ticking the same habit
+  /// used to grant XP again on every tick. Returns true only when XP was
+  /// actually granted this time.
+  static Future<bool> addXPOnce({
+    required String actionKey,
+    required int amount,
+    required String reason,
+  }) async {
+    final uid = _currentUserId;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final claimedKey = 'user_${uid}_xp_claimed_$actionKey';
+      if (prefs.getBool(claimedKey) == true) return false;
+
+      await prefs.setBool(claimedKey, true);
+      await addXP(amount, reason: reason);
+      return true;
+    } catch (e) {
+      debugPrint('GamificationService.addXPOnce error: $e');
       return false;
     }
   }

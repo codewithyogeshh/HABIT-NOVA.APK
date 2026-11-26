@@ -1,11 +1,14 @@
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:synvero/core/services/avatar_service.dart';
 import 'package:synvero/core/services/habit_daily_service.dart';
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/quote_service.dart';
 import 'package:synvero/core/services/streak_badge_service.dart';
+import 'package:synvero/core/services/streak_freeze_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
+import 'package:synvero/core/widgets/streak_freeze_card.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/widgets/spring_pressable.dart';
 import 'package:synvero/core/widgets/ambient_mesh_background.dart';
@@ -26,7 +29,6 @@ import 'package:synvero/features/share/presentation/story_card_dialog.dart';
 import 'package:synvero/features/ai_coach/presentation/ai_coach_sheet.dart';
 import 'package:synvero/features/widgets/presentation/widget_showcase_sheet.dart';
 
-
 /// Home Dashboard screen.
 ///
 /// Implements Screen 3 from the Synvero UI design mockup:
@@ -46,7 +48,8 @@ class DashboardScreen extends StatefulWidget {
   State<DashboardScreen> createState() => _DashboardScreenState();
 }
 
-class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
+class _DashboardScreenState extends State<DashboardScreen>
+    with WidgetsBindingObserver {
   void _showStoryCardDialog() {
     showDialog(
       context: context,
@@ -207,15 +210,20 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       final defaultHabitIds = ['def-1', 'def-2', 'def-3', 'def-4', 'def-5'];
       _habitCompletionMap.clear();
       for (final id in defaultHabitIds) {
-        final isDone = await HabitDailyService.isHabitCompletedToday(currentUserId, id);
+        final isDone = await HabitDailyService.isHabitCompletedToday(
+          currentUserId,
+          id,
+        );
         _habitCompletionMap[id] = isDone;
         if (isDone) completed++;
       }
       _completedHabitsCount = completed;
 
       // 2. Calculate real focus study time
-      final sessionCount = prefs.getInt('user_${currentUserId}_timer_completed_sessions') ?? 0;
-      final focusMins = prefs.getInt('user_${currentUserId}_focus_duration_mins') ?? 25;
+      final sessionCount =
+          prefs.getInt('user_${currentUserId}_timer_completed_sessions') ?? 0;
+      final focusMins =
+          prefs.getInt('user_${currentUserId}_focus_duration_mins') ?? 25;
       _studyMinutes = sessionCount * focusMins;
 
       // 3. Calculate real completed tasks count
@@ -230,13 +238,12 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       _tasksDoneCount = tasksDone;
       _tasksTotalCount = taskIds.length;
 
-      // 4. Calculate real streak (0 if user has not completed any habits)
-      final savedStreak = prefs.getInt('user_${currentUserId}_streak_days');
-      if (savedStreak != null && savedStreak > 0) {
-        _streakDays = savedStreak;
-      } else {
-        _streakDays = completed > 0 ? 1 : 0;
-      }
+      // 4. Streak comes from the freeze-aware service. Midnight rollover above
+      // may already have spent a freeze to keep it alive.
+      final savedStreak = await StreakFreezeService.currentStreak(
+        userId: currentUserId,
+      );
+      _streakDays = savedStreak > 0 ? savedStreak : (completed > 0 ? 1 : 0);
 
       final xp = await GamificationService.loadXP(userId: currentUserId);
       _totalXP = xp;
@@ -274,6 +281,24 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final currentStatus = _habitCompletionMap[habitId] ?? false;
     final newStatus = !currentStatus;
 
+    // A habit completed less than 24 hours ago is locked: un-ticking it would
+    // let the user tick again and farm XP for the same completion.
+    if (currentStatus &&
+        await HabitDailyService.isHabitLocked(currentUserId, habitId)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$habitName is locked for 24 hours after completion.',
+            ),
+            backgroundColor: const Color(0xFF64748B),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() {
       _habitCompletionMap[habitId] = newStatus;
       if (newStatus) {
@@ -281,20 +306,35 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       } else {
         if (_completedHabitsCount > 0) _completedHabitsCount--;
       }
-      _streakDays = _completedHabitsCount > 0 ? 1 : 0;
     });
 
     try {
-      await HabitDailyService.setHabitCompletedToday(currentUserId, habitId, newStatus);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('user_${currentUserId}_streak_days', _streakDays);
+      await HabitDailyService.setHabitCompletedToday(
+        currentUserId,
+        habitId,
+        newStatus,
+      );
+      final streak = await StreakFreezeService.currentStreak(
+        userId: currentUserId,
+      );
+      if (mounted) {
+        setState(() {
+          _streakDays = streak > 0
+              ? streak
+              : (_completedHabitsCount > 0 ? 1 : 0);
+        });
+      }
       AppWidgetService.syncWidget();
       SquadService.syncMyLiveProgressToAllSquads();
     } catch (_) {}
 
     if (mounted) {
       if (newStatus) {
-        await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
+        final bool awarded = await GamificationService.addXPOnce(
+          actionKey: 'habit_${habitId}_${HabitDailyService.getTodayDateStr()}',
+          amount: GamificationService.xpPerHabit,
+          reason: 'Completed Habit',
+        );
         final currentXP = await GamificationService.loadXP();
         if (mounted) {
           setState(() {
@@ -308,7 +348,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           studySessionsToday: 0,
           tasksDoneToday: _tasksDoneCount,
         );
-        if (mounted) {
+        if (mounted && awarded) {
           CelebrationDialog.show(
             context,
             title: 'Habit Completed! 🎉',
@@ -333,10 +373,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
     final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
-    final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
-    final kProgressRingBg = isDark ? const Color(0xFF0A1F30) : const Color(0xFFF1F5F9);
+    final kTextColor = isDark
+        ? const Color(0xFFF1F5F9)
+        : const Color(0xFF0F172A);
+    final kSubtextColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final kBorderColor = isDark
+        ? const Color(0xFF0E3D48)
+        : const Color(0xFFE2E8F0);
+    final kProgressRingBg = isDark
+        ? const Color(0xFF0A1F30)
+        : const Color(0xFFF1F5F9);
 
     final streakBadge = StreakBadgeService.getBadge(_streakDays);
     final displayName = _username != null && _username!.isNotEmpty
@@ -346,8 +394,18 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final today = DateTime.now();
     final weekdayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     final monthNames = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     final dateString =
         '${weekdayNames[today.weekday - 1]}, ${today.day} ${monthNames[today.month - 1]} ${today.year}';
@@ -362,286 +420,144 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         }
       },
       child: Scaffold(
-      backgroundColor: kBgColor,
-      body: AmbientMeshBackground(
-        child: SafeArea(
-        child: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: kPrimaryColor),
-              )
-            : RefreshIndicator(
-                onRefresh: _loadProfile,
-                color: kPrimaryColor,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Top Header: User Greeting & Avatar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
+        backgroundColor: kBgColor,
+        body: AmbientMeshBackground(
+          child: SafeArea(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: kPrimaryColor),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadProfile,
+                    color: kPrimaryColor,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(
+                        20,
+                        16,
+                        20,
+                        kFloatingNavClearance,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Hello, $displayName 👋',
-                                  style: TextStyle(
-                                    color: kTextColor,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  "Keep going! You're doing great!",
-                                  style: TextStyle(
-                                    color: kSubtextColor,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w400,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                                  decoration: BoxDecoration(
-                                    color: streakBadge.color.withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: streakBadge.color.withValues(alpha: 0.5), width: 1.0),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(streakBadge.emoji, style: const TextStyle(fontSize: 12)),
-                                      const SizedBox(width: 5),
-                                      Flexible(
-                                        child: Text(
-                                          '${streakBadge.title} • ${_streakDays}d Streak',
-                                          style: TextStyle(
-                                            color: streakBadge.color,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                InkWell(
-                                  onTap: () {
-                                    BadgesShowcaseSheet.show(context, currentXP: _totalXP, streakDays: _streakDays);
-                                  },
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.5), width: 1.0),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(GamificationService.getLevelInfo(_totalXP).badgeEmoji, style: const TextStyle(fontSize: 12)),
-                                        const SizedBox(width: 5),
-                                        Flexible(
-                                          child: Text(
-                                            'Lvl ${GamificationService.getLevelInfo(_totalXP).level} • ${GamificationService.getLevelInfo(_totalXP).title} ($_totalXP XP) 🏆',
-                                            style: const TextStyle(
-                                              color: Color(0xFF00F0FF),
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                          // Top Header: User Greeting & Avatar
                           Row(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              GestureDetector(
-                                onTap: () {
-                                  HapticFeedback.mediumImpact();
-                                  GooeyNotification.show(
-                                    context,
-                                    title: 'Nova Focus Daily 🚀',
-                                    message: '$_streakDays-Day Streak active! Keep the momentum going.',
-                                    icon: Icons.local_fire_department_rounded,
-                                    type: GooeyNotificationType.streak,
-                                  );
-                                },
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  margin: const EdgeInsets.only(right: 10),
-                                  decoration: BoxDecoration(
-                                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.3) : const Color(0xFFCBD5E1),
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.05),
-                                        blurRadius: 10,
-                                      ),
-                                    ],
-                                  ),
-                                  child: Stack(
-                                    alignment: Alignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.notifications_none_rounded,
-                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
-                                        size: 20,
-                                      ),
-                                      Positioned(
-                                        top: 9,
-                                        right: 9,
-                                        child: Container(
-                                          width: 7,
-                                          height: 7,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFF00E5FF),
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Color(0xFF00E5FF),
-                                                blurRadius: 6,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              UserAvatar(
-                                size: 46,
-                                onTap: () {
-                                  Navigator.of(context).pushNamed('/profile');
-                                },
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Date Pill
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: kCardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: kBorderColor),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.calendar_today_rounded,
-                              size: 14,
-                              color: Color(0xFF3B66FF),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              dateString,
-                              style: TextStyle(
-                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Hero Card: Blue Gradient "Small steps create big results"
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Color(0xFF0284C7),
-                              Color(0xFF0D9488),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(0xFF0284C7).withValues(alpha: 0.3),
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: ValueListenableBuilder<MotivationalQuote>(
-                          valueListenable: QuoteService.currentQuoteNotifier,
-                          builder: (context, quote, _) {
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        LanguageService.tr('daily_motivation'),
-                                        style: TextStyle(
-                                          color: Colors.white.withValues(alpha: 0.95),
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.w700,
-                                          letterSpacing: 0.5,
-                                        ),
+                                    Text(
+                                      'Hello, $displayName 👋',
+                                      style: TextStyle(
+                                        color: kTextColor,
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.3,
                                       ),
                                     ),
-                                    const Spacer(),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      "Keep going! You're doing great!",
+                                      style: TextStyle(
+                                        color: kSubtextColor,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 3.5,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: streakBadge.color.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: streakBadge.color.withValues(
+                                            alpha: 0.5,
+                                          ),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            streakBadge.emoji,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Flexible(
+                                            child: Text(
+                                              '${streakBadge.title} • ${_streakDays}d Streak',
+                                              style: TextStyle(
+                                                color: streakBadge.color,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
                                     InkWell(
                                       onTap: () {
-                                        QuoteService.nextQuote();
+                                        BadgesShowcaseSheet.show(
+                                          context,
+                                          currentXP: _totalXP,
+                                          streakDays: _streakDays,
+                                        );
                                       },
-                                      borderRadius: BorderRadius.circular(16),
+                                      borderRadius: BorderRadius.circular(12),
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 3.5,
+                                        ),
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(12),
+                                          color: const Color(0xFF00F0FF)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: const Color(0xFF00F0FF)
+                                                .withValues(alpha: 0.5),
+                                            width: 1.0,
+                                          ),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            const Icon(Icons.refresh_rounded, size: 14, color: Colors.white),
-                                            const SizedBox(width: 4),
                                             Text(
-                                              'Next Quote',
-                                              style: TextStyle(
-                                                color: Colors.white.withValues(alpha: 0.95),
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
+                                              GamificationService.getLevelInfo(
+                                                _totalXP,
+                                              ).badgeEmoji,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 5),
+                                            Flexible(
+                                              child: Text(
+                                                'Lvl ${GamificationService.getLevelInfo(_totalXP).level} • ${GamificationService.getLevelInfo(_totalXP).title} ($_totalXP XP) 🏆',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF00F0FF),
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                                overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
                                           ],
@@ -650,895 +566,1313 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  '"${quote.text}"',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                    height: 1.3,
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  GestureDetector(
+                                    onTap: () {
+                                      HapticFeedback.mediumImpact();
+                                      GooeyNotification.show(
+                                        context,
+                                        title: 'Nova Focus Daily 🚀',
+                                        message:
+                                            '$_streakDays-Day Streak active! Keep the momentum going.',
+                                        icon:
+                                            Icons.local_fire_department_rounded,
+                                        type: GooeyNotificationType.streak,
+                                      );
+                                    },
+                                    child: Container(
+                                      width: 40,
+                                      height: 40,
+                                      margin: const EdgeInsets.only(right: 10),
+                                      decoration: BoxDecoration(
+                                        color: isDark
+                                            ? const Color(0xFF0F172A)
+                                            : Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isDark
+                                              ? const Color(0xFF00E5FF)
+                                                    .withValues(alpha: 0.3)
+                                              : const Color(0xFFCBD5E1),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isDark
+                                                ? const Color(0xFF00E5FF)
+                                                      .withValues(alpha: 0.1)
+                                                : Colors.black.withValues(
+                                                    alpha: 0.05,
+                                                  ),
+                                            blurRadius: 10,
+                                          ),
+                                        ],
+                                      ),
+                                      child: Stack(
+                                        alignment: Alignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.notifications_none_rounded,
+                                            color: isDark
+                                                ? Colors.white
+                                                : const Color(0xFF0F172A),
+                                            size: 20,
+                                          ),
+                                          Positioned(
+                                            top: 9,
+                                            right: 9,
+                                            child: Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: const BoxDecoration(
+                                                color: Color(0xFF00E5FF),
+                                                shape: BoxShape.circle,
+                                                boxShadow: [
+                                                  BoxShadow(
+                                                    color: Color(0xFF00E5FF),
+                                                    blurRadius: 6,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
                                   ),
+                                  UserAvatar(
+                                    size: 46,
+                                    onTap: () {
+                                      Navigator.of(context)
+                                          .pushNamed('/profile');
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Date Pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kCardBg,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: kBorderColor),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.calendar_today_rounded,
+                                  size: 14,
+                                  color: Color(0xFF3B66FF),
                                 ),
-                                const SizedBox(height: 6),
+                                const SizedBox(width: 6),
                                 Text(
-                                  '— ${quote.author}',
+                                  dateString,
                                   style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.85),
+                                    color: isDark
+                                        ? const Color(0xFF94A3B8)
+                                        : const Color(0xFF475569),
                                     fontSize: 12,
                                     fontWeight: FontWeight.w500,
-                                    fontStyle: FontStyle.italic,
                                   ),
                                 ),
                               ],
-                            );
-                          },
-                        ),
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      // AI Daily Morning Coach Card
-                      AICoachCard(
-                        username: displayName,
-                        streakDays: _streakDays,
-                        habitsCompletedToday: _completedHabitsCount,
-                        totalHabits: 5,
-                        onChatTapped: () {
-                          Navigator.of(context).pushNamed('/ai-assistant');
-                        },
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Weekly Consistency Heatmap
-                      WeeklyHeatmapWidget(streakDays: _streakDays),
-
-                      const SizedBox(height: 20),
-
-                      // Today's Progress Section Title with Share Story Action
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            LanguageService.tr('today_progress'),
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              InkWell(
-                                onTap: () => Navigator.of(context).pushNamed('/leaderboard'),
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.4)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.emoji_events_rounded, size: 12, color: Color(0xFFFFD700)),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Ranks',
-                                        style: TextStyle(
-                                          color: Color(0xFFFFD700),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+
+                          const SizedBox(height: 16),
+
+                          // Hero Card: Blue Gradient "Small steps create big results"
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(20),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [Color(0xFF0284C7), Color(0xFF0D9488)],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFF0284C7)
+                                      .withValues(alpha: 0.3),
+                                  blurRadius: 16,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: ValueListenableBuilder<MotivationalQuote>(
+                              valueListenable:
+                                  QuoteService.currentQuoteNotifier,
+                              builder: (context, quote, _) {
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(
+                                              alpha: 0.2,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            LanguageService.tr(
+                                              'daily_motivation',
+                                            ),
+                                            style: TextStyle(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.95,
+                                              ),
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.w700,
+                                              letterSpacing: 0.5,
+                                            ),
+                                          ),
                                         ),
+                                        const Spacer(),
+                                        InkWell(
+                                          onTap: () {
+                                            QuoteService.nextQuote();
+                                          },
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(
+                                                alpha: 0.2,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.refresh_rounded,
+                                                  size: 14,
+                                                  color: Colors.white,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  'Next Quote',
+                                                  style: TextStyle(
+                                                    color: Colors.white
+                                                        .withValues(
+                                                          alpha: 0.95,
+                                                        ),
+                                                    fontSize: 11,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      '"${quote.text}"',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 15.5,
+                                        fontWeight: FontWeight.w700,
+                                        height: 1.3,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '— ${quote.author}',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(
+                                          alpha: 0.85,
+                                        ),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // AI Daily Morning Coach Card
+                          AICoachCard(
+                            username: displayName,
+                            streakDays: _streakDays,
+                            habitsCompletedToday: _completedHabitsCount,
+                            totalHabits: 5,
+                            onChatTapped: () {
+                              Navigator.of(context).pushNamed('/ai-assistant');
+                            },
+                          ),
+
+                          const SizedBox(height: 16),
+
+                          // Weekly Consistency Heatmap
+                          WeeklyHeatmapWidget(streakDays: _streakDays),
+
+                          const SizedBox(height: 12),
+
+                          // Streak Freeze bank + XP purchase
+                          StreakFreezeCard(
+                            onXPChanged: (xp) {
+                              if (mounted) {
+                                setState(() {
+                                  _totalXP = xp;
+                                });
+                              }
+                            },
+                          ),
+
+                          const SizedBox(height: 20),
+
+                          // Today's Progress Section Title with Share Story Action
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                LanguageService.tr('today_progress'),
+                                style: TextStyle(
+                                  color: kTextColor,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    onTap: () =>
+                                        Navigator.of(context)
+                                            .pushNamed('/leaderboard'),
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFD700)
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFFFFD700)
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.emoji_events_rounded,
+                                            size: 12,
+                                            color: Color(0xFFFFD700),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Ranks',
+                                            style: TextStyle(
+                                              color: Color(0xFFFFD700),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  InkWell(
+                                    onTap: () {
+                                      final quote = QuoteService.currentQuote;
+                                      ShareStoryCardDialog.show(
+                                        context,
+                                        username: displayName,
+                                        streakDays: _streakDays,
+                                        habitsCompleted: _completedHabitsCount,
+                                        totalHabits: 5,
+                                        totalXP: _totalXP,
+                                        quoteText: quote.text,
+                                        quoteAuthor: quote.author,
+                                      );
+                                    },
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF00F0FF)
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: const Color(0xFF00F0FF)
+                                              .withValues(alpha: 0.4),
+                                        ),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            Icons.share_rounded,
+                                            size: 12,
+                                            color: Color(0xFF00F0FF),
+                                          ),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            'Story',
+                                            style: TextStyle(
+                                              color: Color(0xFF00F0FF),
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Progress Grid (Circular gauge on left + 3 stat rows on right)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: kCardBg,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: kBorderColor),
+                            ),
+                            child: Row(
+                              children: [
+                                // Circular Progress Ring
+                                SizedBox(
+                                  width: 110,
+                                  height: 110,
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 100,
+                                        height: 100,
+                                        child: CircularProgressIndicator(
+                                          value: _completedHabitsCount / 5.0,
+                                          strokeWidth: 9,
+                                          backgroundColor: kProgressRingBg,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation(
+                                                Color(0xFF00E5FF),
+                                              ),
+                                        ),
+                                      ),
+                                      Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '$_completedHabitsCount/5',
+                                            style: TextStyle(
+                                              color: kTextColor,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          Text(
+                                            'Habits\ncompleted',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: kSubtextColor,
+                                              fontSize: 10,
+                                              height: 1.1,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 6),
-                              InkWell(
-                                onTap: () {
-                                  final quote = QuoteService.currentQuote;
-                                  ShareStoryCardDialog.show(
-                                    context,
-                                    username: displayName,
-                                    streakDays: _streakDays,
-                                    habitsCompleted: _completedHabitsCount,
-                                    totalHabits: 5,
-                                    totalXP: _totalXP,
-                                    quoteText: quote.text,
-                                    quoteAuthor: quote.author,
-                                  );
-                                },
-                                borderRadius: BorderRadius.circular(12),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF00F0FF).withValues(alpha: 0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: const Color(0xFF00F0FF).withValues(alpha: 0.4)),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
+
+                                const SizedBox(width: 16),
+
+                                // Right Stats Column
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
-                                      Icon(Icons.share_rounded, size: 12, color: Color(0xFF00F0FF)),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Story',
-                                        style: TextStyle(
-                                          color: Color(0xFF00F0FF),
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                      _buildStatPill(
+                                        icon: Icons.timer_outlined,
+                                        iconColor: const Color(0xFF3B66FF),
+                                        bgColor: isDark
+                                            ? const Color(0xFF1E2D48)
+                                            : const Color(0xFFEEF2FF),
+                                        title: LanguageService.tr('study_time'),
+                                        value: _studyMinutes == 0
+                                            ? '0m'
+                                            : (_studyMinutes >= 60
+                                                  ? '${_studyMinutes ~/ 60}h ${_studyMinutes % 60}m'
+                                                  : '${_studyMinutes}m'),
+                                        isDark: isDark,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildStatPill(
+                                        icon: Icons.checklist_rounded,
+                                        iconColor: const Color(0xFF10B981),
+                                        bgColor: isDark
+                                            ? const Color(0xFF132E27)
+                                            : const Color(0xFFD1FAE5),
+                                        title: LanguageService.tr(
+                                          'active_tasks',
                                         ),
+                                        value:
+                                            '$_tasksDoneCount/$_tasksTotalCount',
+                                        isDark: isDark,
+                                      ),
+                                      const SizedBox(height: 8),
+                                      _buildStatPill(
+                                        icon:
+                                            Icons.local_fire_department_rounded,
+                                        iconColor: const Color(0xFFF59E0B),
+                                        bgColor: isDark
+                                            ? const Color(0xFF332511)
+                                            : const Color(0xFFFEF3C7),
+                                        title: LanguageService.tr('day_streak'),
+                                        value:
+                                            '$_streakDays ${_streakDays == 1 ? "day" : "days"}',
+                                        isDark: isDark,
                                       ),
                                     ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          // Quick Actions Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                LanguageService.tr('quick_actions'),
+                                style: TextStyle(
+                                  color: kTextColor,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pushNamed('/habits');
+                                },
+                                child: const Text(
+                                  'View all',
+                                  style: TextStyle(
+                                    color: kPrimaryColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
+                          const SizedBox(height: 8),
 
-                      // Progress Grid (Circular gauge on left + 3 stat rows on right)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: kCardBg,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: kBorderColor),
-                        ),
-                        child: Row(
-                          children: [
-                            // Circular Progress Ring
-                            SizedBox(
-                              width: 110,
-                              height: 110,
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  SizedBox(
-                                    width: 100,
-                                    height: 100,
-                                    child: CircularProgressIndicator(
-                                      value: _completedHabitsCount / 5.0,
-                                      strokeWidth: 9,
-                                      backgroundColor: kProgressRingBg,
-                                      valueColor: const AlwaysStoppedAnimation(
-                                        Color(0xFF00E5FF),
+                          // Quick Actions Scrollable Row (6 Features)
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                _buildQuickActionButton(
+                                  icon: Icons.eco_rounded,
+                                  label: 'Habits',
+                                  color: const Color(0xFF10B981),
+                                  bgColor: const Color(0xFFD1FAE5),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/habits')
+                                        .then((_) => _loadProfile());
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.hourglass_top_rounded,
+                                  label: 'Study Timer',
+                                  color: const Color(0xFF8B5CF6),
+                                  bgColor: const Color(0xFFEDE9FE),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context).pushNamed('/timer');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.checklist_rounded,
+                                  label: 'Tasks',
+                                  color: const Color(0xFF3B66FF),
+                                  bgColor: const Color(0xFFDBEAFE),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context).pushNamed('/tasks');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.auto_awesome_rounded,
+                                  label: 'AI Assistant',
+                                  imageAsset:
+                                      'assets/images/ai_assistant_logo.png',
+                                  color: const Color(0xFF6366F1),
+                                  bgColor: const Color(0xFFE0E7FF),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/ai-assistant');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.bar_chart_rounded,
+                                  label: 'Statistics',
+                                  color: const Color(0xFF00E5FF),
+                                  bgColor: const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.15),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/statistics');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.emoji_events_rounded,
+                                  label: 'Leaderboard',
+                                  color: const Color(0xFFFFD700),
+                                  bgColor: const Color(0xFFFFD700)
+                                      .withValues(alpha: 0.15),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/leaderboard');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.groups_rounded,
+                                  label: LanguageService.tr('squads'),
+                                  color: const Color(0xFFEC4899),
+                                  bgColor: const Color(0xFFFCE7F3),
+                                  isDark: isDark,
+                                  onTap: () {
+                                    Navigator.of(context).pushNamed('/squads');
+                                  },
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.photo_camera_back_rounded,
+                                  label: LanguageService.tr('story_card'),
+                                  color: const Color(0xFFF59E0B),
+                                  bgColor: const Color(0xFFFEF3C7),
+                                  isDark: isDark,
+                                  onTap: _showStoryCardDialog,
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.psychology_alt_rounded,
+                                  label: LanguageService.tr('ai_coach'),
+                                  color: const Color(0xFFF97316),
+                                  bgColor: const Color(0xFFFFEDD5),
+                                  isDark: isDark,
+                                  onTap: _showAiCoachSheet,
+                                ),
+                                const SizedBox(width: 14),
+                                _buildQuickActionButton(
+                                  icon: Icons.widgets_rounded,
+                                  label: LanguageService.tr('home_widget'),
+                                  color: const Color(0xFF06B6D4),
+                                  bgColor: const Color(0xFFCFFAFE),
+                                  isDark: isDark,
+                                  onTap: _showWidgetShowcaseSheet,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          const SizedBox(height: 24),
+
+                          const SizedBox(height: 20),
+
+                          // Viral Growth & Utility Highlights Banner
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                // Card 1: Habit Squads
+                                InkWell(
+                                  onTap: () =>
+                                      Navigator.of(context)
+                                          .pushNamed('/squads'),
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 260,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF831843),
+                                          Color(0xFF500724),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFFF472B6)
+                                            .withValues(alpha: 0.4),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF831843)
+                                              .withValues(alpha: 0.3),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white24,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                '⚔️ HABIT BATTLE',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              color: Colors.white70,
+                                              size: 14,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const Text(
+                                          'मित्रांसोबत चॅलेंज खेळा!',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'WhatsApp वर इनव्हाईट करा आणि कोणाचा Streak टिकतो ते बघा 🔥',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '$_completedHabitsCount/5',
-                                        style: TextStyle(
-                                          color: kTextColor,
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w700,
-                                        ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Card 2: Aesthetic Story Poster
+                                InkWell(
+                                  onTap: _showStoryCardDialog,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 260,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF0F766E),
+                                          Color(0xFF134E4A),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
                                       ),
-                                      Text(
-                                        'Habits\ncompleted',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: kSubtextColor,
-                                          fontSize: 10,
-                                          height: 1.1,
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFF2DD4BF)
+                                            .withValues(alpha: 0.4),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0F766E)
+                                              .withValues(alpha: 0.3),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
                                         ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white24,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                '📸 1-CLICK SHARE',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              color: Colors.white70,
+                                              size: 14,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const Text(
+                                          'Aesthetic Story Poster',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'Streak आणि Focus चे सुंदर कार्ड WhatsApp / Insta वर शेअर करा 🚀',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+
+                                // Card 3: Home Screen Widget
+                                InkWell(
+                                  onTap: _showWidgetShowcaseSheet,
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 260,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF0369A1),
+                                          Color(0xFF0C4A6E),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(0xFF38BDF8)
+                                            .withValues(alpha: 0.4),
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(0xFF0369A1)
+                                              .withValues(alpha: 0.3),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white24,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                              ),
+                                              child: const Text(
+                                                '📱 HOME WIDGET',
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                            const Icon(
+                                              Icons.arrow_forward_ios_rounded,
+                                              color: Colors.white70,
+                                              size: 14,
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 10),
+                                        const Text(
+                                          'Home Screen Widget',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'ॲप न उघडता थेट फोनच्या स्क्रीनवर सवयी पूर्ण करा ⚡',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Today's Habits Section Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                LanguageService.tr('today_habits'),
+                                style: TextStyle(
+                                  color: kTextColor,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context)
+                                      .pushNamed('/habits')
+                                      .then((_) => _loadProfile());
+                                },
+                                child: const Text(
+                                  'View all',
+                                  style: TextStyle(
+                                    color: kPrimaryColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Today's Habits List (Dynamic & User-isolated)
+                          ..._todayHabitItems.take(3).map((habit) {
+                            final habitId = habit['id'] as String;
+                            final habitName = habit['name'] as String;
+                            final isDone =
+                                _habitCompletionMap[habitId] ?? false;
+
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: SpringPressable(
+                                onTap: () =>
+                                    _toggleDashboardHabit(habitId, habitName),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 14,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: kCardBg,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: isDone
+                                          ? const Color(0xFF10B981)
+                                                .withValues(alpha: 0.3)
+                                          : kBorderColor,
+                                      width: isDone ? 1.4 : 1.0,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: isDark ? 0.2 : 0.02,
+                                        ),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-
-                            const SizedBox(width: 16),
-
-                            // Right Stats Column
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildStatPill(
-                                    icon: Icons.timer_outlined,
-                                    iconColor: const Color(0xFF3B66FF),
-                                    bgColor: isDark ? const Color(0xFF1E2D48) : const Color(0xFFEEF2FF),
-                                    title: LanguageService.tr('study_time'),
-                                    value: _studyMinutes == 0
-                                        ? '0m'
-                                        : (_studyMinutes >= 60
-                                            ? '${_studyMinutes ~/ 60}h ${_studyMinutes % 60}m'
-                                            : '${_studyMinutes}m'),
-                                    isDark: isDark,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _buildStatPill(
-                                    icon: Icons.checklist_rounded,
-                                    iconColor: const Color(0xFF10B981),
-                                    bgColor: isDark ? const Color(0xFF132E27) : const Color(0xFFD1FAE5),
-                                    title: LanguageService.tr('active_tasks'),
-                                    value: '$_tasksDoneCount/$_tasksTotalCount',
-                                    isDark: isDark,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _buildStatPill(
-                                    icon: Icons.local_fire_department_rounded,
-                                    iconColor: const Color(0xFFF59E0B),
-                                    bgColor: isDark ? const Color(0xFF332511) : const Color(0xFFFEF3C7),
-                                    title: LanguageService.tr('day_streak'),
-                                    value: '$_streakDays ${_streakDays == 1 ? "day" : "days"}',
-                                    isDark: isDark,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Quick Actions Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            LanguageService.tr('quick_actions'),
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pushNamed('/habits');
-                            },
-                            child: const Text(
-                              'View all',
-                              style: TextStyle(
-                                color: kPrimaryColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Quick Actions Scrollable Row (6 Features)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildQuickActionButton(
-                              icon: Icons.eco_rounded,
-                              label: 'Habits',
-                              color: const Color(0xFF10B981),
-                              bgColor: const Color(0xFFD1FAE5),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/habits').then((_) => _loadProfile());
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.hourglass_top_rounded,
-                              label: 'Study Timer',
-                              color: const Color(0xFF8B5CF6),
-                              bgColor: const Color(0xFFEDE9FE),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/timer');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.checklist_rounded,
-                              label: 'Tasks',
-                              color: const Color(0xFF3B66FF),
-                              bgColor: const Color(0xFFDBEAFE),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/tasks');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.auto_awesome_rounded,
-                              label: 'AI Assistant',
-                              imageAsset: 'assets/images/ai_assistant_logo.png',
-                              color: const Color(0xFF6366F1),
-                              bgColor: const Color(0xFFE0E7FF),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/ai-assistant');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.bar_chart_rounded,
-                              label: 'Statistics',
-                              color: const Color(0xFF00E5FF),
-                              bgColor: const Color(0xFF00E5FF).withValues(alpha: 0.15),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/statistics');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.emoji_events_rounded,
-                              label: 'Leaderboard',
-                              color: const Color(0xFFFFD700),
-                              bgColor: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/leaderboard');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.groups_rounded,
-                              label: LanguageService.tr('squads'),
-                              color: const Color(0xFFEC4899),
-                              bgColor: const Color(0xFFFCE7F3),
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/squads');
-                              },
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.photo_camera_back_rounded,
-                              label: LanguageService.tr('story_card'),
-                              color: const Color(0xFFF59E0B),
-                              bgColor: const Color(0xFFFEF3C7),
-                              isDark: isDark,
-                              onTap: _showStoryCardDialog,
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.psychology_alt_rounded,
-                              label: LanguageService.tr('ai_coach'),
-                              color: const Color(0xFFF97316),
-                              bgColor: const Color(0xFFFFEDD5),
-                              isDark: isDark,
-                              onTap: _showAiCoachSheet,
-                            ),
-                            const SizedBox(width: 14),
-                            _buildQuickActionButton(
-                              icon: Icons.widgets_rounded,
-                              label: LanguageService.tr('home_widget'),
-                              color: const Color(0xFF06B6D4),
-                              bgColor: const Color(0xFFCFFAFE),
-                              isDark: isDark,
-                              onTap: _showWidgetShowcaseSheet,
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      
-                      const SizedBox(height: 20),
-
-                      // Viral Growth & Utility Highlights Banner
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            // Card 1: Habit Squads
-                            InkWell(
-                              onTap: () => Navigator.of(context).pushNamed('/squads'),
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                width: 260,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF831843), Color(0xFF500724)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFFF472B6).withValues(alpha: 0.4)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF831843).withValues(alpha: 0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white24,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Text(
-                                            '⚔️ HABIT BATTLE',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: isDark
+                                              ? (habit['color'] as Color)
+                                                    .withValues(alpha: 0.15)
+                                              : habit['bgColor'] as Color,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
                                         ),
-                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'मित्रांसोबत चॅलेंज खेळा!',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'WhatsApp वर इनव्हाईट करा आणि कोणाचा Streak टिकतो ते बघा 🔥',
-                                      style: TextStyle(fontSize: 11, color: Colors.white70),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-
-                            // Card 2: Aesthetic Story Poster
-                            InkWell(
-                              onTap: _showStoryCardDialog,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                width: 260,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0F766E), Color(0xFF134E4A)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFF2DD4BF).withValues(alpha: 0.4)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0F766E).withValues(alpha: 0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white24,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Text(
-                                            '📸 1-CLICK SHARE',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                                          ),
+                                        child: Icon(
+                                          habit['icon'] as IconData,
+                                          color: habit['color'] as Color,
+                                          size: 22,
                                         ),
-                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Aesthetic Story Poster',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'Streak आणि Focus चे सुंदर कार्ड WhatsApp / Insta वर शेअर करा 🚀',
-                                      style: TextStyle(fontSize: 11, color: Colors.white70),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-
-                            // Card 3: Home Screen Widget
-                            InkWell(
-                              onTap: _showWidgetShowcaseSheet,
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                width: 260,
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0369A1), Color(0xFF0C4A6E)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFF38BDF8).withValues(alpha: 0.4)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0369A1).withValues(alpha: 0.3),
-                                      blurRadius: 12,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white24,
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: const Text(
-                                            '📱 HOME WIDGET',
-                                            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.white),
-                                          ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              habitName,
+                                              style: TextStyle(
+                                                color: kTextColor,
+                                                fontSize: 15,
+                                                fontWeight: FontWeight.w600,
+                                                decoration: isDone
+                                                    ? TextDecoration.lineThrough
+                                                    : null,
+                                                decorationColor: const Color(
+                                                  0xFF94A3B8,
+                                                ),
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              isDone
+                                                  ? 'Completed'
+                                                  : 'Pending • ${habit['target']}',
+                                              style: TextStyle(
+                                                color: isDone
+                                                    ? const Color(0xFF10B981)
+                                                    : kSubtextColor,
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                        const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    const Text(
-                                      'Home Screen Widget',
-                                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    const Text(
-                                      'ॲप न उघडता थेट फोनच्या स्क्रीनवर सवयी पूर्ण करा ⚡',
-                                      style: TextStyle(fontSize: 11, color: Colors.white70),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Today's Habits Section Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            LanguageService.tr('today_habits'),
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pushNamed('/habits').then((_) => _loadProfile());
-                            },
-                            child: const Text(
-                              'View all',
-                              style: TextStyle(
-                                color: kPrimaryColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Today's Habits List (Dynamic & User-isolated)
-                      ..._todayHabitItems.take(3).map((habit) {
-                        final habitId = habit['id'] as String;
-                        final habitName = habit['name'] as String;
-                        final isDone = _habitCompletionMap[habitId] ?? false;
-
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: SpringPressable(
-                            onTap: () => _toggleDashboardHabit(habitId, habitName),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                              decoration: BoxDecoration(
-                                color: kCardBg,
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: isDone
-                                      ? const Color(0xFF10B981).withValues(alpha: 0.3)
-                                      : kBorderColor,
-                                  width: isDone ? 1.4 : 1.0,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
+                                      ),
+                                      // Interactive Checkbox
+                                      Icon(
+                                        isDone
+                                            ? Icons.check_circle_rounded
+                                            : Icons
+                                                  .radio_button_unchecked_rounded,
+                                        color: isDone
+                                            ? const Color(0xFF00E5FF)
+                                            : (isDark
+                                                  ? const Color(0xFF0E3D48)
+                                                  : const Color(0xFFCBD5E1)),
+                                        size: 26,
+                                      ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 44,
-                                    height: 44,
+                            );
+                          }),
+
+                          const SizedBox(height: 24),
+
+                          // Lifestyle & Wellness Plans Header
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                LanguageService.tr('lifestyle_wellness'),
+                                style: TextStyle(
+                                  color: kTextColor,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.of(context).pushNamed('/nutrition');
+                                },
+                                child: const Text(
+                                  'View all',
+                                  style: TextStyle(
+                                    color: kPrimaryColor,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Nutrition and Fitness 2-Column Cards
+                          Row(
+                            children: [
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.of(context)
+                                        .pushNamed('/nutrition');
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
-                                      color: isDark ? (habit['color'] as Color).withValues(alpha: 0.15) : habit['bgColor'] as Color,
-                                      borderRadius: BorderRadius.circular(12),
+                                      color: kCardBg,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: kBorderColor),
                                     ),
-                                    child: Icon(
-                                      habit['icon'] as IconData,
-                                      color: habit['color'] as Color,
-                                      size: 22,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? const Color(0xFF10B981)
+                                                      .withValues(alpha: 0.15)
+                                                : const Color(0xFFD1FAE5),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.restaurant_menu_rounded,
+                                            color: Color(0xFF10B981),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
                                         Text(
-                                          habitName,
+                                          LanguageService.tr('nutrition_plan'),
                                           style: TextStyle(
                                             color: kTextColor,
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            decoration: isDone ? TextDecoration.lineThrough : null,
-                                            decorationColor: const Color(0xFF94A3B8),
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                         const SizedBox(height: 2),
                                         Text(
-                                          isDone ? 'Completed' : 'Pending • ${habit['target']}',
+                                          '1,200 kcal plan',
                                           style: TextStyle(
-                                            color: isDone ? const Color(0xFF10B981) : kSubtextColor,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
+                                            color: kSubtextColor,
+                                            fontSize: 11.5,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  // Interactive Checkbox
-                                  Icon(
-                                    isDone
-                                        ? Icons.check_circle_rounded
-                                        : Icons.radio_button_unchecked_rounded,
-                                    color: isDone
-                                        ? const Color(0xFF00E5FF)
-                                        : (isDark ? const Color(0xFF0E3D48) : const Color(0xFFCBD5E1)),
-                                    size: 26,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.of(context).pushNamed('/fitness');
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: kCardBg,
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: kBorderColor),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 40,
+                                          decoration: BoxDecoration(
+                                            color: isDark
+                                                ? const Color(0xFFF59E0B)
+                                                      .withValues(alpha: 0.15)
+                                                : const Color(0xFFFEF3C7),
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          child: const Icon(
+                                            Icons.fitness_center_rounded,
+                                            color: Color(0xFFF59E0B),
+                                            size: 20,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 10),
+                                        Text(
+                                          LanguageService.tr('fitness_plan'),
+                                          style: TextStyle(
+                                            color: kTextColor,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '4 Days/Week',
+                                          style: TextStyle(
+                                            color: kSubtextColor,
+                                            fontSize: 11.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                        );
-                      }),
 
-                      const SizedBox(height: 24),
-
-                      // Lifestyle & Wellness Plans Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            LanguageService.tr('lifestyle_wellness'),
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.of(context).pushNamed('/nutrition');
-                            },
-                            child: const Text(
-                              'View all',
-                              style: TextStyle(
-                                color: kPrimaryColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
+                          const SizedBox(height: 24),
                         ],
                       ),
-                      const SizedBox(height: 8),
-
-                      // Nutrition and Fitness 2-Column Cards
-                      Row(
-                        children: [
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/nutrition');
-                              },
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: kCardBg,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: kBorderColor),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFFD1FAE5),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.restaurant_menu_rounded,
-                                        color: Color(0xFF10B981),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      LanguageService.tr('nutrition_plan'),
-                                      style: TextStyle(
-                                        color: kTextColor,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '1,200 kcal plan',
-                                      style: TextStyle(
-                                        color: kSubtextColor,
-                                        fontSize: 11.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: InkWell(
-                              onTap: () {
-                                Navigator.of(context).pushNamed('/fitness');
-                              },
-                              borderRadius: BorderRadius.circular(16),
-                              child: Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: kCardBg,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(color: kBorderColor),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: isDark ? const Color(0xFFF59E0B).withValues(alpha: 0.15) : const Color(0xFFFEF3C7),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: const Icon(
-                                        Icons.fitness_center_rounded,
-                                        color: Color(0xFFF59E0B),
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      LanguageService.tr('fitness_plan'),
-                                      style: TextStyle(
-                                        color: kTextColor,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '4 Days/Week',
-                                      style: TextStyle(
-                                        color: kSubtextColor,
-                                        fontSize: 11.5,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 24),
-                    ],
+                    ),
                   ),
+          ),
+        ),
+        bottomNavigationBar: widget.isEmbedded
+            ? null
+            : SafeArea(
+                child: SlidingPillNavBar(
+                  currentIndex: _currentTabIndex,
+                  isDark: isDark,
+                  onTap: (index) {
+                    setState(() {
+                      _currentTabIndex = index;
+                    });
+                    if (index == 1) {
+                      Navigator.of(context).pushNamed('/habits').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                        _loadProfile();
+                      });
+                    } else if (index == 2) {
+                      Navigator.of(context).pushNamed('/timer').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    } else if (index == 3) {
+                      Navigator.of(context).pushNamed('/tasks').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    } else if (index == 4) {
+                      Navigator.of(context).pushNamed('/profile').then((_) {
+                        if (mounted) setState(() => _currentTabIndex = 0);
+                      });
+                    }
+                  },
+                  items: const [
+                    SlidingPillItem(
+                      icon: Icons.home_outlined,
+                      activeIcon: Icons.home_rounded,
+                      label: 'Home',
+                    ),
+                    SlidingPillItem(
+                      icon: Icons.calendar_today_outlined,
+                      activeIcon: Icons.calendar_month_rounded,
+                      label: 'Habits',
+                    ),
+                    SlidingPillItem(
+                      icon: Icons.timer_outlined,
+                      activeIcon: Icons.timer_rounded,
+                      label: 'Timer',
+                    ),
+                    SlidingPillItem(
+                      icon: Icons.checklist_rounded,
+                      activeIcon: Icons.task_alt_rounded,
+                      label: 'Tasks',
+                    ),
+                    SlidingPillItem(
+                      icon: Icons.person_outline_rounded,
+                      activeIcon: Icons.person_rounded,
+                      label: 'Profile',
+                    ),
+                  ],
                 ),
               ),
       ),
-      ),
-      bottomNavigationBar: widget.isEmbedded ? null : SafeArea(
-        child: SlidingPillNavBar(
-          currentIndex: _currentTabIndex,
-          isDark: isDark,
-          onTap: (index) {
-            setState(() {
-              _currentTabIndex = index;
-            });
-            if (index == 1) {
-              Navigator.of(context).pushNamed('/habits').then((_) {
-                if (mounted) setState(() => _currentTabIndex = 0);
-                _loadProfile();
-              });
-            } else if (index == 2) {
-              Navigator.of(context).pushNamed('/timer').then((_) {
-                if (mounted) setState(() => _currentTabIndex = 0);
-              });
-            } else if (index == 3) {
-              Navigator.of(context).pushNamed('/tasks').then((_) {
-                if (mounted) setState(() => _currentTabIndex = 0);
-              });
-            } else if (index == 4) {
-              Navigator.of(context).pushNamed('/profile').then((_) {
-                if (mounted) setState(() => _currentTabIndex = 0);
-              });
-            }
-          },
-          items: const [
-            SlidingPillItem(
-              icon: Icons.home_outlined,
-              activeIcon: Icons.home_rounded,
-              label: 'Home',
-            ),
-            SlidingPillItem(
-              icon: Icons.calendar_today_outlined,
-              activeIcon: Icons.calendar_month_rounded,
-              label: 'Habits',
-            ),
-            SlidingPillItem(
-              icon: Icons.timer_outlined,
-              activeIcon: Icons.timer_rounded,
-              label: 'Timer',
-            ),
-            SlidingPillItem(
-              icon: Icons.checklist_rounded,
-              activeIcon: Icons.task_alt_rounded,
-              label: 'Tasks',
-            ),
-            SlidingPillItem(
-              icon: Icons.person_outline_rounded,
-              activeIcon: Icons.person_rounded,
-              label: 'Profile',
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
+    );
+  }
 
   /// Shows confirmation popup when user presses phone back button to prevent accidental exit
   Future<bool> _showExitConfirmationDialog(BuildContext context) async {
@@ -1602,7 +1936,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 Text(
                   LanguageService.tr('exit_dialog_title'),
                   style: TextStyle(
-                    color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                    color: isDark
+                        ? const Color(0xFFF1F5F9)
+                        : const Color(0xFF0F172A),
                     fontSize: 19,
                     fontWeight: FontWeight.w800,
                   ),
@@ -1614,7 +1950,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                   LanguageService.tr('exit_dialog_msg'),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                    color: isDark
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF64748B),
                     fontSize: 13,
                     height: 1.4,
                   ),
@@ -1629,7 +1967,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         onPressed: () => Navigator.of(ctx).pop(false),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: isDark ? const Color(0xFF0E3D48) : const Color(0xFFCBD5E1),
+                            color: isDark
+                                ? const Color(0xFF0E3D48)
+                                : const Color(0xFFCBD5E1),
                           ),
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
@@ -1639,7 +1979,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                         child: Text(
                           LanguageService.tr('exit_btn_stay'),
                           style: TextStyle(
-                            color: isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A),
+                            color: isDark
+                                ? const Color(0xFFF1F5F9)
+                                : const Color(0xFF0F172A),
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
                           ),
@@ -1741,50 +2083,68 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }) {
     return SpringPressable(
       onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF071728).withValues(alpha: 0.85) : bgColor,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: imageAsset != null
-                    ? const Color(0xFF00F0FF).withValues(alpha: 0.6)
-                    : (isDark ? color.withValues(alpha: 0.3) : const Color(0xFFE2E8F0)),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (imageAsset != null ? const Color(0xFF00F0FF) : color).withValues(alpha: isDark ? 0.22 : 0.08),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
+      child: SizedBox(
+        width: 72,
+        child: Column(
+          children: [
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF071728).withValues(alpha: 0.85)
+                    : bgColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: imageAsset != null
+                      ? const Color(0xFF00F0FF).withValues(alpha: 0.6)
+                      : (isDark
+                            ? color.withValues(alpha: 0.3)
+                            : const Color(0xFFE2E8F0)),
+                  width: 1.2,
                 ),
-              ],
+                boxShadow: [
+                  BoxShadow(
+                    color:
+                        (imageAsset != null ? const Color(0xFF00F0FF) : color)
+                            .withValues(alpha: isDark ? 0.22 : 0.08),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: imageAsset != null
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        imageAsset,
+                        width: 58,
+                        height: 58,
+                        fit: BoxFit.cover,
+                      ),
+                    )
+                  : Icon(icon, color: color, size: 28),
             ),
-            child: imageAsset != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(
-                      imageAsset,
-                      width: 58,
-                      height: 58,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                : Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              color: isDark ? const Color(0xFFF1F5F9) : kDarkText,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
+            const SizedBox(height: 6),
+            // Two-line slot keeps every quick action label the same height and
+            // stops long labels (e.g. "Story Card 📸") from colliding.
+            SizedBox(
+              height: 30,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: isDark ? const Color(0xFFF1F5F9) : kDarkText,
+                  fontSize: 11.5,
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

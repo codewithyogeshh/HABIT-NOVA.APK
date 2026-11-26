@@ -333,8 +333,14 @@ class LeaderboardService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefKeyLastShared, DateTime.now().toIso8601String());
 
-      // Award community sharing bonus
-      await GamificationService.addXP(25, reason: 'Shared Progress to Leaderboard');
+      // Community sharing bonus is capped at once per day, otherwise the
+      // button could be tapped repeatedly for free XP.
+      await GamificationService.addXPOnce(
+        actionKey:
+            'leaderboard_share_${DateTime.now().toIso8601String().split('T').first}',
+        amount: 25,
+        reason: 'Shared Progress to Leaderboard',
+      );
       await GamificationService.unlockBadge('streak_warrior');
 
       // Fetch latest stats and immediately sync to cloud

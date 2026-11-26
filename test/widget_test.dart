@@ -359,7 +359,7 @@ void main() {
     expect(Theme.of(context).brightness, Brightness.light);
   });
 
-  testWidgets('Ticking a habit updates subtitle to 1/1 completed and unticking sets 0/1 completed',
+  testWidgets('Ticking a habit updates subtitle to 1/1 completed and stays locked for 24 hours',
       (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
 
@@ -383,14 +383,23 @@ void main() {
     // Verify Meditate is now completed with '1/1 completed'
     expect(find.text('1/1 completed'), findsOneWidget);
 
-    // Scroll Meditate into view again, then tap to untick it
+    // Tapping again within 24 hours must NOT un-tick it: un-ticking and
+    // re-ticking the same habit used to award XP over and over.
+    // Clear the celebration toast first so it can't swallow the tap.
+    ScaffoldMessenger.of(tester.element(find.byType(synvero_habits.HabitScreen)))
+        .clearSnackBars();
+    await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Meditate'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Meditate'));
     await tester.pumpAndSettle();
 
-    // Verify Meditate reverted back to '0/1 completed'
-    expect(find.text('1/1 completed'), findsNothing);
+    // Still completed, and the user is told why.
+    expect(find.text('1/1 completed'), findsOneWidget);
+    expect(
+      find.text('This habit is locked for 24 hours after completion.'),
+      findsOneWidget,
+    );
   });
 
   test('AIResponseEngine answers tech, study, and fitness questions accurately', () {

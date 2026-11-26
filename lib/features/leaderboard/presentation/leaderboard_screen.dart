@@ -7,6 +7,7 @@ import 'package:synvero/core/services/leaderboard_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/widgets/user_avatar.dart';
+import 'package:synvero/core/widgets/app_state_views.dart';
 
 /// HabbitNova Community Leaderboard Screen with 100% REAL users only.
 ///
@@ -83,9 +84,12 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     setState(() => _isPublishing = true);
     HapticFeedback.mediumImpact();
 
+    final int xpBefore = _userXP;
     await LeaderboardService.publishUserProgress();
 
     final newXP = await GamificationService.loadXP();
+    // The +25 XP bonus is granted only on the first share of the day.
+    final bool gainedBonus = newXP >= xpBefore + 25;
     setState(() {
       _userXP = newXP;
       _isPublishing = false;
@@ -97,7 +101,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       CelebrationDialog.show(
         context,
         title: 'Progress Shared to Leaderboard! 🌟',
-        subtitle: 'Your rank has been updated in HabbitNova community! (+25 XP Bonus)',
+        subtitle: gainedBonus
+            ? 'Your rank has been updated in HabbitNova community! (+25 XP Bonus)'
+            : 'Your rank has been updated in HabbitNova community!',
         streakDays: _userStreak,
       );
     }
@@ -142,7 +148,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Color(0xFF00E5FF)))
+          ? const AppSkeletonList(itemCount: 6, showHeader: false)
           : SafeArea(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

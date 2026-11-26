@@ -1,16 +1,20 @@
 import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/widgets/ambient_mesh_background.dart';
+
 import 'dart:ui';
+
 import 'package:synvero/app/theme/app_colors.dart';
 import 'package:synvero/core/services/language_service.dart';
 import 'package:synvero/core/services/notification_service.dart';
 import 'package:synvero/core/services/supabase_service.dart';
 import 'package:synvero/core/services/task_service.dart';
 import 'package:synvero/features/tasks/presentation/family_nag_widget.dart';
+import 'package:synvero/core/widgets/app_state_views.dart';
 
 /// Tasks screen with real-time push notifications, loud alarms, and dynamic user scheduling.
 class TasksScreen extends StatefulWidget {
@@ -96,6 +100,23 @@ class _TasksScreenState extends State<TasksScreen> {
   }
 
   Future<void> _toggleTask(TaskItem task) async {
+    // Locked for 24 hours after completion: un-ticking and re-ticking the same
+    // task used to hand out XP again on every tick.
+    if (task.isCompleted &&
+        task.completedAt != null &&
+        DateTime.now().difference(task.completedAt!) <
+            const Duration(hours: 24)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('This task is locked for 24 hours after completion.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     final becameCompleted = !task.isCompleted;
 
     // 1. Instant tactile micro-feedback + 0-latency UI state toggle
@@ -120,7 +141,12 @@ class _TasksScreenState extends State<TasksScreen> {
     unawaited(() async {
       await TaskService.toggleTask(task);
       if (becameCompleted) {
-        await GamificationService.addXP(GamificationService.xpPerTask, reason: 'Completed Task');
+        await GamificationService.addXPOnce(
+          actionKey:
+              'task_${task.id}_${DateTime.now().toIso8601String().split('T').first}',
+          amount: GamificationService.xpPerTask,
+          reason: 'Completed Task',
+        );
         if (doneCount >= 4) {
           await GamificationService.unlockBadge('task_crusher');
         }
@@ -148,24 +174,29 @@ class _TasksScreenState extends State<TasksScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           final timeStr = selectedTime.format(context);
-          final isToday = selectedDate.year == DateTime.now().year &&
+          final isToday =
+              selectedDate.year == DateTime.now().year &&
               selectedDate.month == DateTime.now().month &&
               selectedDate.day == DateTime.now().day;
-          final isTomorrow = selectedDate.year == DateTime.now().year &&
+          final isTomorrow =
+              selectedDate.year == DateTime.now().year &&
               selectedDate.month == DateTime.now().month &&
               selectedDate.day == DateTime.now().day + 1;
 
           final dateStr = isToday
               ? 'Today'
               : (isTomorrow
-                  ? 'Tomorrow'
-                  : '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}');
+                    ? 'Tomorrow'
+                    : '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}');
 
           return AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Text(isForTomorrow ? 'Plan Tomorrow Task' : 'Add New Task',
-                style: const TextStyle(fontWeight: FontWeight.w700)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              isForTomorrow ? 'Plan Tomorrow Task' : 'Add New Task',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -178,36 +209,46 @@ class _TasksScreenState extends State<TasksScreen> {
                       labelText: 'Task Title',
                       hintText: 'e.g. Study Java, Gym, Project work',
                       border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Date & Time',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Date & Time',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       // Date Selector
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today_rounded,
-                              size: 16),
-                          label: Text(dateStr,
-                              style: const TextStyle(fontSize: 12)),
+                          icon: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 16,
+                          ),
+                          label: Text(
+                            dateStr,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 12),
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () async {
                             final picked = await showDatePicker(
                               context: context,
                               initialDate: selectedDate,
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now()
-                                  .add(const Duration(days: 365)),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
                             );
                             if (picked != null) {
                               setDialogState(() {
@@ -221,18 +262,27 @@ class _TasksScreenState extends State<TasksScreen> {
                       // Time Selector
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.alarm_rounded,
-                              size: 18, color: kPrimaryColor),
-                          label: Text(timeStr,
-                              style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: kPrimaryColor)),
+                          icon: const Icon(
+                            Icons.alarm_rounded,
+                            size: 18,
+                            color: kPrimaryColor,
+                          ),
+                          label: Text(
+                            timeStr,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kPrimaryColor,
+                            ),
+                          ),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 12),
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10)),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () async {
                             final picked = await showTimePicker(
@@ -241,15 +291,19 @@ class _TasksScreenState extends State<TasksScreen> {
                               initialEntryMode: TimePickerEntryMode.dialOnly,
                               builder: (pickerContext, child) {
                                 return MediaQuery(
-                                  data: MediaQuery.of(pickerContext).copyWith(
-                                    viewInsets: EdgeInsets.zero,
-                                  ),
+                                  data: MediaQuery.of(pickerContext)
+                                      .copyWith(viewInsets: EdgeInsets.zero),
                                   child: Theme(
                                     data: Theme.of(pickerContext).copyWith(
-                                      inputDecorationTheme: const InputDecorationTheme(
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                                        border: OutlineInputBorder(),
-                                      ),
+                                      inputDecorationTheme:
+                                          const InputDecorationTheme(
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 4,
+                                                ),
+                                            border: OutlineInputBorder(),
+                                          ),
                                     ),
                                     child: child ?? const SizedBox(),
                                   ),
@@ -267,9 +321,10 @@ class _TasksScreenState extends State<TasksScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text('Priority',
-                      style:
-                          TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Priority',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: ['High', 'Medium', 'Low'].map((p) {
@@ -299,17 +354,25 @@ class _TasksScreenState extends State<TasksScreen> {
                 child: const Text('Cancel'),
               ),
               ElevatedButton.icon(
-                icon: const Icon(Icons.alarm_on_rounded,
-                    color: Colors.white, size: 18),
+                icon: const Icon(
+                  Icons.alarm_on_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
-                label: const Text('Save & Set Alarm',
-                    style: TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.w600)),
+                label: const Text(
+                  'Save & Set Alarm',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ],
           );
@@ -328,18 +391,20 @@ class _TasksScreenState extends State<TasksScreen> {
         selectedTime.minute,
       );
 
-      final isToday = selectedDate.year == DateTime.now().year &&
+      final isToday =
+          selectedDate.year == DateTime.now().year &&
           selectedDate.month == DateTime.now().month &&
           selectedDate.day == DateTime.now().day;
-      final isTomorrowDate = selectedDate.year == DateTime.now().year &&
+      final isTomorrowDate =
+          selectedDate.year == DateTime.now().year &&
           selectedDate.month == DateTime.now().month &&
           selectedDate.day == DateTime.now().day + 1;
 
       final formattedTime = isToday
           ? selectedTime.format(context)
           : (isTomorrowDate
-              ? 'Tomorrow, ${selectedTime.format(context)}'
-              : '${selectedDate.day}/${selectedDate.month}, ${selectedTime.format(context)}');
+                ? 'Tomorrow, ${selectedTime.format(context)}'
+                : '${selectedDate.day}/${selectedDate.month}, ${selectedTime.format(context)}');
 
       final newTask = TaskItem(
         id: 'task-custom-${DateTime.now().millisecondsSinceEpoch}',
@@ -359,8 +424,11 @@ class _TasksScreenState extends State<TasksScreen> {
           SnackBar(
             content: Row(
               children: [
-                const Icon(Icons.notifications_active_rounded,
-                    color: Colors.white, size: 20),
+                const Icon(
+                  Icons.notifications_active_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -400,9 +468,15 @@ class _TasksScreenState extends State<TasksScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
     final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
-    final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final kTextColor = isDark
+        ? const Color(0xFFF1F5F9)
+        : const Color(0xFF0F172A);
+    final kSubtextColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final kBorderColor = isDark
+        ? const Color(0xFF0E3D48)
+        : const Color(0xFFE2E8F0);
 
     final now = DateTime.now();
 
@@ -422,7 +496,9 @@ class _TasksScreenState extends State<TasksScreen> {
       if (t.isCompleted) return false;
       if (t.isUpcoming) return true;
       if (t.scheduledDate != null) {
-        return t.scheduledDate!.isAfter(DateTime(now.year, now.month, now.day, 23, 59, 59));
+        return t.scheduledDate!.isAfter(
+          DateTime(now.year, now.month, now.day, 23, 59, 59),
+        );
       }
       return false;
     }).toList();
@@ -437,7 +513,11 @@ class _TasksScreenState extends State<TasksScreen> {
         leading: widget.isEmbedded
             ? null
             : IconButton(
-                icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: kTextColor,
+                  size: 22,
+                ),
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -458,8 +538,11 @@ class _TasksScreenState extends State<TasksScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_active_outlined,
-                color: kPrimaryColor, size: 22),
+            icon: const Icon(
+              Icons.notifications_active_outlined,
+              color: kPrimaryColor,
+              size: 22,
+            ),
             tooltip: 'Test Loud Alarm',
             onPressed: _triggerTestNotification,
           ),
@@ -475,7 +558,11 @@ class _TasksScreenState extends State<TasksScreen> {
                   color: kPrimaryColor,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -483,260 +570,296 @@ class _TasksScreenState extends State<TasksScreen> {
       ),
       body: AmbientMeshBackground(
         child: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
-            : RefreshIndicator(
-                onRefresh: _loadTasks,
-                color: kPrimaryColor,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Segmented Filter Pills [Today] [Upcoming] [All]
-                      Row(
-                        children: [
-                          _buildFilterPill('Today', 0, isDark, kCardBg, kBorderColor),
-                          const SizedBox(width: 8),
-                          _buildFilterPill('Upcoming', 1, isDark, kCardBg, kBorderColor),
-                          const SizedBox(width: 8),
-                          _buildFilterPill('All', 2, isDark, kCardBg, kBorderColor),
-                        ],
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      // Loving Family Nag & Scold Card (speaks in user's native language)
-                      if (displayedTasks.isNotEmpty)
-                        FamilyNagWidget(
-                          pendingCount: pendingTasks.length,
-                          totalCount: displayedTasks.length,
-                          username: _username,
-                          onFocusWork: () {
-                            final lang = LanguageService.currentLanguageCode;
-                            final toastMsg = lang == LanguageService.marathi
-                                ? 'शाब्बास! असाच फोकस ठेव आणि एक-एक काम संपव! 🎯'
-                                : (lang == LanguageService.hindi
-                                    ? 'शाबाश! पूरा ध्यान लगाकर काम खत्म करो! 🎯'
-                                    : 'Let\'s go! Focus mode activated, knock them out! 🎯');
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  toastMsg,
-                                  style: const TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                                backgroundColor: const Color(0xFF10B981),
-                                duration: const Duration(seconds: 2),
-                              ),
-                            );
-                          },
+          child: _isLoading
+              ? const AppSkeletonList(itemCount: 5)
+              : RefreshIndicator(
+                  onRefresh: _loadTasks,
+                  color: kPrimaryColor,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      kFloatingNavClearance,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Segmented Filter Pills [Today] [Upcoming] [All]
+                        Row(
+                          children: [
+                            _buildFilterPill(
+                              'Today',
+                              0,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildFilterPill(
+                              'Upcoming',
+                              1,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
+                            ),
+                            const SizedBox(width: 8),
+                            _buildFilterPill(
+                              'All',
+                              2,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
+                            ),
+                          ],
                         ),
 
-                      // Task Lists (Separated Active vs Completed)
-                      if (displayedTasks.isEmpty)
-                        Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 40),
-                            child: Column(
-                              children: [
-                                Icon(Icons.checklist_rtl_rounded,
-                                    size: 48,
-                                    color: kSubtextColor.withValues(alpha: 0.5)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _selectedFilterIndex == 1
-                                      ? 'No upcoming tasks scheduled!'
-                                      : 'No tasks here yet!',
-                                  style: TextStyle(
-                                      color: kTextColor,
+                        const SizedBox(height: 20),
+
+                        // Loving Family Nag & Scold Card (speaks in user's native language)
+                        if (displayedTasks.isNotEmpty)
+                          FamilyNagWidget(
+                            pendingCount: pendingTasks.length,
+                            totalCount: displayedTasks.length,
+                            username: _username,
+                            onFocusWork: () {
+                              final lang = LanguageService.currentLanguageCode;
+                              final toastMsg = lang == LanguageService.marathi
+                                  ? 'शाब्बास! असाच फोकस ठेव आणि एक-एक काम संपव! 🎯'
+                                  : (lang == LanguageService.hindi
+                                        ? 'शाबाश! पूरा ध्यान लगाकर काम खत्म करो! 🎯'
+                                        : 'Let\'s go! Focus mode activated, knock them out! 🎯');
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    toastMsg,
+                                    style: const TextStyle(
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 15),
+                                    ),
+                                  ),
+                                  backgroundColor: const Color(0xFF10B981),
+                                  duration: const Duration(seconds: 2),
                                 ),
-                                const SizedBox(height: 6),
+                              );
+                            },
+                          ),
+
+                        // Task Lists (Separated Active vs Completed)
+                        if (displayedTasks.isEmpty)
+                          AppEmptyState(
+                            icon: Icons.checklist_rtl_rounded,
+                            title: _selectedFilterIndex == 1
+                                ? 'No upcoming tasks scheduled'
+                                : 'No tasks here yet',
+                            message: 'Add a task with a time and it will show up here with its own alarm.',
+                            actionLabel: 'Add a task',
+                            onAction: () => _showAddTaskDialog(),
+                          )
+                        else ...[
+                          // 1. Incomplete / Active Tasks Section
+                          if (pendingTasks.isNotEmpty) ...[
+                            Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFF59E0B),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 Text(
-                                  'Tap "+" above to add your tasks & alarms',
-                                  style: TextStyle(color: kSubtextColor, fontSize: 13),
+                                  '${LanguageService.tr('pending_tasks')} (${pendingTasks.length})',
+                                  style: TextStyle(
+                                    color: kTextColor,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ],
                             ),
-                          ),
-                        )
-                      else ...[
-                        // 1. Incomplete / Active Tasks Section
-                        if (pendingTasks.isNotEmpty) ...[
-                          Row(
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFF59E0B),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                '${LanguageService.tr('pending_tasks')} (${pendingTasks.length})',
-                                style: TextStyle(
-                                  color: kTextColor,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          ...pendingTasks.map((task) => _buildTaskCard(
+                            const SizedBox(height: 10),
+                            ...pendingTasks.map(
+                              (task) => _buildTaskCard(
                                 task,
                                 isDark,
                                 kCardBg,
                                 kBorderColor,
                                 kTextColor,
                                 kSubtextColor,
-                              )),
-                        ],
-
-                        // 2. Completed Tasks Section (Separate List)
-                        if (completedTasks.isNotEmpty) ...[
-                          const SizedBox(height: 14),
-                          InkWell(
-                            onTap: () {
-                              setState(() {
-                                _isCompletedExpanded = !_isCompletedExpanded;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(10),
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFF10B981),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${LanguageService.tr('completed_tasks')} (${completedTasks.length})',
-                                    style: TextStyle(
-                                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '${completedTasks.length}',
-                                          style: const TextStyle(
-                                            color: Color(0xFF10B981),
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          _isCompletedExpanded
-                                              ? Icons.keyboard_arrow_up_rounded
-                                              : Icons.keyboard_arrow_down_rounded,
-                                          color: const Color(0xFF10B981),
-                                          size: 16,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 10),
-                          if (_isCompletedExpanded)
-                            ...completedTasks.map((task) => _buildTaskCard(
+                          ],
+
+                          // 2. Completed Tasks Section (Separate List)
+                          if (completedTasks.isNotEmpty) ...[
+                            const SizedBox(height: 14),
+                            InkWell(
+                              onTap: () {
+                                setState(() {
+                                  _isCompletedExpanded = !_isCompletedExpanded;
+                                });
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFF10B981),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      '${LanguageService.tr('completed_tasks')} (${completedTasks.length})',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? const Color(0xFF94A3B8)
+                                            : const Color(0xFF64748B),
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF10B981)
+                                            .withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${completedTasks.length}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF10B981),
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            _isCompletedExpanded
+                                                ? Icons
+                                                      .keyboard_arrow_up_rounded
+                                                : Icons
+                                                      .keyboard_arrow_down_rounded,
+                                            color: const Color(0xFF10B981),
+                                            size: 16,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (_isCompletedExpanded)
+                              ...completedTasks.map(
+                                (task) => _buildTaskCard(
                                   task,
                                   isDark,
                                   kCardBg,
                                   kBorderColor,
                                   kTextColor,
                                   kSubtextColor,
-                                )),
-                        ],
-                      ],
-
-                      const SizedBox(height: 24),
-
-                      // Real Dynamic Upcoming Section Header
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Upcoming Schedule',
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          TextButton.icon(
-                            icon: const Icon(Icons.add_rounded, size: 16, color: kPrimaryColor),
-                            label: const Text(
-                              'Plan Tomorrow',
-                              style: TextStyle(
-                                color: kPrimaryColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            onPressed: () => _showAddTaskDialog(isForTomorrow: true),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      if (upcomingList.isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                          decoration: BoxDecoration(
-                            color: kCardBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: kBorderColor),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(Icons.event_note_rounded,
-                                  size: 34, color: kSubtextColor.withValues(alpha: 0.5)),
-                              const SizedBox(height: 8),
-                              Text(
-                                'No upcoming schedule for tomorrow',
-                                style: TextStyle(
-                                  color: kTextColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tap "Plan Tomorrow" to add your work and set alarms!',
-                                style: TextStyle(color: kSubtextColor, fontSize: 12),
-                                textAlign: TextAlign.center,
+                          ],
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Real Dynamic Upcoming Section Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Upcoming Schedule',
+                              style: TextStyle(
+                                color: kTextColor,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
                               ),
-                            ],
-                          ),
-                        )
-                      else
-                        ...upcomingList.map((task) => Container(
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(
+                                Icons.add_rounded,
+                                size: 16,
+                                color: kPrimaryColor,
+                              ),
+                              label: const Text(
+                                'Plan Tomorrow',
+                                style: TextStyle(
+                                  color: kPrimaryColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onPressed: () =>
+                                  _showAddTaskDialog(isForTomorrow: true),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        if (upcomingList.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 20,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kCardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: kBorderColor),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.event_note_rounded,
+                                  size: 34,
+                                  color: kSubtextColor.withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No upcoming schedule for tomorrow',
+                                  style: TextStyle(
+                                    color: kTextColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tap "Plan Tomorrow" to add your work and set alarms!',
+                                  style: TextStyle(
+                                    color: kSubtextColor,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ...upcomingList.map(
+                            (task) => Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               child: _buildUpcomingCard(
                                 task: task,
@@ -746,87 +869,120 @@ class _TasksScreenState extends State<TasksScreen> {
                                 textColor: kTextColor,
                                 subtextColor: kSubtextColor,
                               ),
-                            )),
+                            ),
+                          ),
 
-                      const SizedBox(height: 80),
-                    ],
-                  ),
-                ),
-              ),
-      ),
-      ),
-      bottomNavigationBar: widget.isEmbedded ? null : SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(26),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF071728).withValues(alpha: 0.88) : Colors.white.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(26),
-                  border: Border.all(
-                    color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.22) : const Color(0xFFE2E8F0),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: isDark ? const Color(0xFF00E5FF).withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 20,
-                      offset: const Offset(0, 6),
+                        const SizedBox(height: 80),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-                child: BottomNavigationBar(
-                  currentIndex: _currentTabIndex,
-                  elevation: 0,
-                  onTap: (index) {
-                    setState(() {
-                      _currentTabIndex = index;
-                    });
-                    if (index == 0) {
-                      Navigator.of(context).pushReplacementNamed('/dashboard');
-                    } else if (index == 1) {
-                      Navigator.of(context).pushNamed('/habits');
-                    } else if (index == 2) {
-                      Navigator.of(context).pushNamed('/timer');
-                    } else if (index == 4) {
-                      Navigator.of(context).pushNamed('/profile');
-                    }
-                  },
-                  type: BottomNavigationBarType.fixed,
-                  backgroundColor: Colors.transparent,
-                  selectedItemColor: isDark ? const Color(0xFF00F0FF) : kPrimaryColor,
-                  unselectedItemColor:
-                      isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-                  selectedLabelStyle:
-                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
-                  unselectedLabelStyle:
-                      const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
-                  items: const [
-                    BottomNavigationBarItem(
-                        icon: Icon(Icons.home_rounded), label: 'Home'),
-                    BottomNavigationBarItem(
-                        icon: Icon(Icons.calendar_today_rounded), label: 'Habits'),
-                    BottomNavigationBarItem(
-                        icon: Icon(Icons.timer_outlined), label: 'Timer'),
-                    BottomNavigationBarItem(
-                        icon: Icon(Icons.checklist_rounded), label: 'Tasks'),
-                    BottomNavigationBarItem(
-                        icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
-                  ],
+        ),
+      ),
+      bottomNavigationBar: widget.isEmbedded
+          ? null
+          : SafeArea(
+              child: Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 12),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(26),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF071728).withValues(alpha: 0.88)
+                            : Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF00E5FF).withValues(alpha: 0.22)
+                              : const Color(0xFFE2E8F0),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isDark
+                                ? const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.08)
+                                : Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 20,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: BottomNavigationBar(
+                        currentIndex: _currentTabIndex,
+                        elevation: 0,
+                        onTap: (index) {
+                          setState(() {
+                            _currentTabIndex = index;
+                          });
+                          if (index == 0) {
+                            Navigator.of(context)
+                                .pushReplacementNamed('/dashboard');
+                          } else if (index == 1) {
+                            Navigator.of(context).pushNamed('/habits');
+                          } else if (index == 2) {
+                            Navigator.of(context).pushNamed('/timer');
+                          } else if (index == 4) {
+                            Navigator.of(context).pushNamed('/profile');
+                          }
+                        },
+                        type: BottomNavigationBarType.fixed,
+                        backgroundColor: Colors.transparent,
+                        selectedItemColor: isDark
+                            ? const Color(0xFF00F0FF)
+                            : kPrimaryColor,
+                        unselectedItemColor: isDark
+                            ? const Color(0xFF64748B)
+                            : const Color(0xFF94A3B8),
+                        selectedLabelStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        unselectedLabelStyle: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        items: const [
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.home_rounded),
+                            label: 'Home',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.calendar_today_rounded),
+                            label: 'Habits',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.timer_outlined),
+                            label: 'Timer',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.checklist_rounded),
+                            label: 'Tasks',
+                          ),
+                          BottomNavigationBarItem(
+                            icon: Icon(Icons.person_outline_rounded),
+                            label: 'Profile',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
   Widget _buildFilterPill(
-      String label, int index, bool isDark, Color cardBg, Color borderColor) {
+    String label,
+    int index,
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+  ) {
     final isSelected = _selectedFilterIndex == index;
     return GestureDetector(
       onTap: () {
@@ -840,9 +996,7 @@ class _TasksScreenState extends State<TasksScreen> {
         decoration: BoxDecoration(
           color: isSelected ? kPrimaryColor : cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? kPrimaryColor : borderColor,
-          ),
+          border: Border.all(color: isSelected ? kPrimaryColor : borderColor),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -875,110 +1029,131 @@ class _TasksScreenState extends State<TasksScreen> {
     Color textColor,
     Color subtextColor,
   ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: task.isCompleted
-              ? const Color(0xFF10B981).withValues(alpha: 0.3)
-              : borderColor,
-          width: task.isCompleted ? 1.4 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+    return Semantics(
+      container: true,
+      checked: task.isCompleted,
+      label:
+          '${task.title}, ${task.time}, ${task.isCompleted ? 'completed' : 'pending'}',
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: task.isCompleted
+                ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                : borderColor,
+            width: task.isCompleted ? 1.4 : 1.0,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // Checkbox
-          GestureDetector(
-            onTap: () => _toggleTask(task),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                color: task.isCompleted ? kPrimaryColor : Colors.transparent,
-                border: Border.all(
-                  color: task.isCompleted
-                      ? kPrimaryColor
-                      : (isDark
-                          ? const Color(0xFF475569)
-                          : const Color(0xFFCBD5E1)),
-                  width: 1.5,
-                ),
-              ),
-              child: task.isCompleted
-                  ? const Center(
-                      child:
-                          Icon(Icons.check_rounded, color: Colors.white, size: 15),
-                    )
-                  : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
             ),
-          ),
-          const SizedBox(width: 14),
-
-          // Title & Time
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.title,
-                  style: TextStyle(
-                    color: task.isCompleted
-                        ? (isDark ? const Color(0xFF64748B) : kSecondaryText)
-                        : textColor,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    decoration:
-                        task.isCompleted ? TextDecoration.lineThrough : null,
-                    decorationColor: const Color(0xFF94A3B8),
+          ],
+        ),
+        child: Row(
+          children: [
+            // Checkbox — padded to a comfortable 44dp touch target
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => _toggleTask(task),
+              child: SizedBox(
+                width: 44,
+                height: 44,
+                child: Center(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      color: task.isCompleted
+                          ? kPrimaryColor
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: task.isCompleted
+                            ? kPrimaryColor
+                            : (isDark
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFFCBD5E1)),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: task.isCompleted
+                        ? const Center(
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 15,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.alarm_rounded,
+              ),
+            ),
+            const SizedBox(width: 6),
+
+            // Title & Time
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    task.title,
+                    style: TextStyle(
+                      color: task.isCompleted
+                          ? (isDark ? const Color(0xFF64748B) : kSecondaryText)
+                          : textColor,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      decoration: task.isCompleted
+                          ? TextDecoration.lineThrough
+                          : null,
+                      decorationColor: const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.alarm_rounded,
                         size: 13,
                         color: task.isCompleted
                             ? subtextColor.withValues(alpha: 0.5)
-                            : const Color(0xFFF59E0B)),
-                    const SizedBox(width: 4),
-                    Text(
-                      task.time,
-                      style: TextStyle(
-                        color: subtextColor,
-                        fontSize: 12,
+                            : const Color(0xFFF59E0B),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                      const SizedBox(width: 4),
+                      Text(
+                        task.time,
+                        style: TextStyle(color: subtextColor, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
 
-          // Priority Badge
-          _buildPriorityBadge(task.priority, isDark),
-          const SizedBox(width: 8),
+            // Priority Badge
+            _buildPriorityBadge(task.priority, isDark),
+            const SizedBox(width: 8),
 
-          // Delete button
-          IconButton(
-            icon: Icon(Icons.delete_outline_rounded,
-                size: 18, color: subtextColor.withValues(alpha: 0.6)),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            onPressed: () => _deleteTask(task.id),
-          ),
-        ],
+            // Delete button
+            IconButton(
+              icon: Icon(
+                Icons.delete_outline_rounded,
+                size: 18,
+                color: subtextColor.withValues(alpha: 0.6),
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              onPressed: () => _deleteTask(task.id),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1061,7 +1236,11 @@ class _TasksScreenState extends State<TasksScreen> {
               color: priorityColor.withValues(alpha: isDark ? 0.2 : 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.event_available_rounded, color: priorityColor, size: 20),
+            child: Icon(
+              Icons.event_available_rounded,
+              color: priorityColor,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1083,10 +1262,7 @@ class _TasksScreenState extends State<TasksScreen> {
                     const SizedBox(width: 4),
                     Text(
                       task.time,
-                      style: TextStyle(
-                        color: subtextColor,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: subtextColor, fontSize: 12),
                     ),
                   ],
                 ),
@@ -1094,7 +1270,11 @@ class _TasksScreenState extends State<TasksScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline_rounded, size: 18, color: subtextColor),
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              size: 18,
+              color: subtextColor,
+            ),
             onPressed: () => _deleteTask(task.id),
           ),
         ],

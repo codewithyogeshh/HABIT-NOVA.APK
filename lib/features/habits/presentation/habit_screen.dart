@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:synvero/core/widgets/celebration_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:synvero/core/widgets/ambient_mesh_background.dart';
@@ -13,6 +14,7 @@ import 'package:synvero/features/habits/data/models/habit_model.dart';
 import 'package:synvero/core/services/gamification_service.dart';
 import 'package:synvero/features/dashboard/presentation/weekly_heatmap_widget.dart';
 import 'package:synvero/features/habits/presentation/water_tracker_card.dart';
+import 'package:synvero/core/widgets/app_state_views.dart';
 
 /// Habit Tracker screen with real user-created upcoming schedules.
 class HabitScreen extends StatefulWidget {
@@ -142,7 +144,10 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
 
       for (final habit in _defaultHabits) {
         final hid = habit['id'] as String;
-        final isDone = await HabitDailyService.isHabitCompletedToday(_currentUserId, hid);
+        final isDone = await HabitDailyService.isHabitCompletedToday(
+          _currentUserId,
+          hid,
+        );
         habit['completed'] = isDone;
         habit['subtitle'] = _getHabitSubtitle(hid, isDone);
       }
@@ -171,6 +176,32 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _toggleCompletion(String habitId, bool isRealDb) async {
+    // A habit completed less than 24 hours ago can't be un-ticked, otherwise it
+    // could be ticked again for repeated XP from the same completion.
+    final bool currentlyCompleted = isRealDb
+        ? (_todayCompletion[habitId] ?? false)
+        : ((_defaultHabits.firstWhere(
+                    (h) => h['id'] == habitId,
+                    orElse: () => <String, dynamic>{'completed': false},
+                  )['completed']
+                  as bool?) ??
+              false);
+
+    if (currentlyCompleted &&
+        await HabitDailyService.isHabitLocked(_currentUserId, habitId)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This habit is locked for 24 hours after completion.',
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
     // 1. Instant tactile micro-feedback
     HapticFeedback.lightImpact();
 
@@ -180,13 +211,32 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
     if (isRealDb) {
       final isCurrentlyCompleted = _todayCompletion[habitId] ?? false;
       becameCompleted = !isCurrentlyCompleted;
-      final habit = _habits.firstWhere((h) => h.id == habitId, orElse: () => Habit(id: '', userId: '', name: 'Habit', createdAt: DateTime.now(), updatedAt: DateTime.now()));
+      final habit = _habits.firstWhere(
+        (h) => h.id == habitId,
+        orElse: () => Habit(
+          id: '',
+          userId: '',
+          name: 'Habit',
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+        ),
+      );
       habitName = habit.name;
 
       // Instant optimistic UI update
       setState(() {
         _todayCompletion[habitId] = becameCompleted;
       });
+
+      // Keep the local completion record in sync so the 24h un-tick lock has
+      // a timestamp to work with, even for cloud-backed habits.
+      unawaited(
+        HabitDailyService.setHabitCompletedToday(
+          _currentUserId,
+          habitId,
+          becameCompleted,
+        ),
+      );
 
       unawaited(() async {
         try {
@@ -210,7 +260,13 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         habit['subtitle'] = _getHabitSubtitle(habitId, newStatus);
       });
 
-      unawaited(HabitDailyService.setHabitCompletedToday(_currentUserId, habitId, newStatus));
+      unawaited(
+        HabitDailyService.setHabitCompletedToday(
+          _currentUserId,
+          habitId,
+          newStatus,
+        ),
+      );
     }
 
     if (becameCompleted) {
@@ -228,7 +284,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
       }
 
       unawaited(() async {
-        await GamificationService.addXP(GamificationService.xpPerHabit, reason: 'Completed Habit');
+        await GamificationService.addXPOnce(
+          actionKey: 'habit_${habitId}_${HabitDailyService.getTodayDateStr()}',
+          amount: GamificationService.xpPerHabit,
+          reason: 'Completed Habit',
+        );
         await GamificationService.checkAndAwardBadges(
           streakDays: doneCount > 0 ? 1 : 0,
           habitsCompletedToday: doneCount,
@@ -246,14 +306,17 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   Future<void> _showAddScheduleDialog() async {
     final titleController = TextEditingController();
     String selectedPriority = 'Medium';
-    DateTime selectedDate = DateTime.now().add(const Duration(days: 1)); // Default tomorrow
+    DateTime selectedDate = DateTime.now().add(
+      const Duration(days: 1),
+    ); // Default tomorrow
     TimeOfDay selectedTime = const TimeOfDay(hour: 10, minute: 0);
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
-          final isTomorrow = selectedDate.year == DateTime.now().year &&
+          final isTomorrow =
+              selectedDate.year == DateTime.now().year &&
               selectedDate.month == DateTime.now().month &&
               selectedDate.day == DateTime.now().day + 1;
           final dateStr = isTomorrow
@@ -262,8 +325,13 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
           final timeStr = selectedTime.format(context);
 
           return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Add Upcoming Schedule', style: TextStyle(fontWeight: FontWeight.w700)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: const Text(
+              'Add Upcoming Schedule',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -275,28 +343,46 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                     decoration: InputDecoration(
                       labelText: 'Task / Schedule Title',
                       hintText: 'e.g. Project presentation, Meeting',
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Date & Time', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Date & Time',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.calendar_today_rounded, size: 16),
-                          label: Text(dateStr, style: const TextStyle(fontSize: 12)),
+                          icon: const Icon(
+                            Icons.calendar_today_rounded,
+                            size: 16,
+                          ),
+                          label: Text(
+                            dateStr,
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () async {
                             final picked = await showDatePicker(
                               context: context,
                               initialDate: selectedDate,
                               firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
                             );
                             if (picked != null) {
                               setDialogState(() {
@@ -309,11 +395,27 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.alarm_rounded, size: 18, color: kPrimaryColor),
-                          label: Text(timeStr, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: kPrimaryColor)),
+                          icon: const Icon(
+                            Icons.alarm_rounded,
+                            size: 18,
+                            color: kPrimaryColor,
+                          ),
+                          label: Text(
+                            timeStr,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: kPrimaryColor,
+                            ),
+                          ),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 12,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                           onPressed: () async {
                             final picked = await showTimePicker(
@@ -322,15 +424,19 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                               initialEntryMode: TimePickerEntryMode.dialOnly,
                               builder: (pickerContext, child) {
                                 return MediaQuery(
-                                  data: MediaQuery.of(pickerContext).copyWith(
-                                    viewInsets: EdgeInsets.zero,
-                                  ),
+                                  data: MediaQuery.of(pickerContext)
+                                      .copyWith(viewInsets: EdgeInsets.zero),
                                   child: Theme(
                                     data: Theme.of(pickerContext).copyWith(
-                                      inputDecorationTheme: const InputDecorationTheme(
-                                        contentPadding: EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                                        border: OutlineInputBorder(),
-                                      ),
+                                      inputDecorationTheme:
+                                          const InputDecorationTheme(
+                                            contentPadding:
+                                                EdgeInsets.symmetric(
+                                                  horizontal: 4,
+                                                  vertical: 4,
+                                                ),
+                                            border: OutlineInputBorder(),
+                                          ),
                                     ),
                                     child: child ?? const SizedBox(),
                                   ),
@@ -348,7 +454,10 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  const Text('Priority', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text(
+                    'Priority',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 6),
                   Row(
                     children: ['High', 'Medium', 'Low'].map((p) {
@@ -378,13 +487,22 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                 child: const Text('Cancel'),
               ),
               ElevatedButton.icon(
-                icon: const Icon(Icons.alarm_on_rounded, color: Colors.white, size: 18),
+                icon: const Icon(
+                  Icons.alarm_on_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: kPrimaryColor,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 onPressed: () => Navigator.of(context).pop(true),
-                label: const Text('Save & Set Alarm', style: TextStyle(color: Colors.white)),
+                label: const Text(
+                  'Save & Set Alarm',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           );
@@ -402,7 +520,8 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         selectedTime.minute,
       );
 
-      final isTomorrow = selectedDate.year == DateTime.now().year &&
+      final isTomorrow =
+          selectedDate.year == DateTime.now().year &&
           selectedDate.month == DateTime.now().month &&
           selectedDate.day == DateTime.now().day + 1;
 
@@ -442,7 +561,10 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('New Habit', style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text(
+          'New Habit',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -452,7 +574,9 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
               decoration: InputDecoration(
                 labelText: 'Habit Name',
                 hintText: 'e.g. Morning Yoga, Read 10 pages',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -461,7 +585,9 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
               decoration: InputDecoration(
                 labelText: 'Description (optional)',
                 hintText: 'e.g. Before 8 AM',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],
@@ -474,10 +600,15 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: kPrimaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Add Habit', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Add Habit',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -487,7 +618,9 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
       try {
         await _repository.createHabit(
           name: nameController.text.trim(),
-          description: descController.text.trim().isEmpty ? null : descController.text.trim(),
+          description: descController.text.trim().isEmpty
+              ? null
+              : descController.text.trim(),
           color: '#3B66FF',
           icon: 'task_alt',
         );
@@ -513,9 +646,15 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final kBgColor = isDark ? const Color(0xFF030814) : const Color(0xFFF8FAFC);
     final kCardBg = isDark ? const Color(0xFF071728) : Colors.white;
-    final kTextColor = isDark ? const Color(0xFFF1F5F9) : const Color(0xFF0F172A);
-    final kSubtextColor = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
-    final kBorderColor = isDark ? const Color(0xFF0E3D48) : const Color(0xFFE2E8F0);
+    final kTextColor = isDark
+        ? const Color(0xFFF1F5F9)
+        : const Color(0xFF0F172A);
+    final kSubtextColor = isDark
+        ? const Color(0xFF94A3B8)
+        : const Color(0xFF64748B);
+    final kBorderColor = isDark
+        ? const Color(0xFF0E3D48)
+        : const Color(0xFFE2E8F0);
     final kBottomNavBg = isDark ? const Color(0xFF050E1A) : Colors.white;
 
     return Scaffold(
@@ -528,7 +667,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         leading: widget.isEmbedded
             ? null
             : IconButton(
-                icon: Icon(Icons.arrow_back_rounded, color: kTextColor, size: 22),
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: kTextColor,
+                  size: 22,
+                ),
                 onPressed: () {
                   if (Navigator.of(context).canPop()) {
                     Navigator.of(context).pop();
@@ -560,7 +703,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                   color: kPrimaryColor,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 22,
+                ),
               ),
             ),
           ),
@@ -568,163 +715,202 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
       ),
       body: AmbientMeshBackground(
         child: SafeArea(
-        child: _isLoading
-            ? const Center(child: CircularProgressIndicator(color: kPrimaryColor))
-            : RefreshIndicator(
-                onRefresh: _loadData,
-                color: kPrimaryColor,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Timeframe Filter Pills [Today] [Weekly] [Monthly]
-                      Row(
-                        children: [
-                          _buildFilterPill('Today', 0, isDark, kCardBg, kBorderColor),
-                          const SizedBox(width: 8),
-                          _buildFilterPill('Weekly', 1, isDark, kCardBg, kBorderColor),
-                          const SizedBox(width: 8),
-                          _buildFilterPill('Monthly', 2, isDark, kCardBg, kBorderColor),
-                        ],
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      // Weekly Consistency Heatmap
-                      const WeeklyHeatmapWidget(streakDays: 1),
-
-                      const SizedBox(height: 16),
-
-                      // Interactive Water Tracker
-                      const WaterTrackerCard(),
-
-                      const SizedBox(height: 20),
-
-                      // Habits List
-                      if (_habits.isNotEmpty) ...[
-                        ..._habits.map((habit) {
-                          final isCompleted = _todayCompletion[habit.id] ?? false;
-                          return _buildHabitCard(
-                            id: habit.id,
-                            name: habit.name,
-                            subtitle: isCompleted ? 'Completed today' : 'Tap to mark done',
-                            icon: Icons.check_circle_outline_rounded,
-                            color: kPrimaryColor,
-                            bgColor: const Color(0xFFDBEAFE),
-                            isCompleted: isCompleted,
-                            isRealDb: true,
-                            isDark: isDark,
-                            cardBg: kCardBg,
-                            borderColor: kBorderColor,
-                            textColor: kTextColor,
-                            subtextColor: kSubtextColor,
-                          );
-                        }),
-                      ] else ...[
-                        ..._defaultHabits.map((habit) {
-                          return _buildHabitCard(
-                            id: habit['id'] as String,
-                            name: habit['name'] as String,
-                            subtitle: habit['subtitle'] as String,
-                            icon: habit['icon'] as IconData,
-                            color: habit['color'] as Color,
-                            bgColor: habit['bgColor'] as Color,
-                            isCompleted: habit['completed'] as bool,
-                            isRealDb: false,
-                            isDark: isDark,
-                            cardBg: kCardBg,
-                            borderColor: kBorderColor,
-                            textColor: kTextColor,
-                            subtextColor: kSubtextColor,
-                          );
-                        }),
-                      ],
-
-                      const SizedBox(height: 24),
-
-                      // Real Upcoming Section Header with Add Button
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Upcoming Schedule',
-                            style: TextStyle(
-                              color: kTextColor,
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+          child: _isLoading
+              ? const AppSkeletonList(itemCount: 4)
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: kPrimaryColor,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(
+                      20,
+                      8,
+                      20,
+                      kFloatingNavClearance,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Timeframe Filter Pills [Today] [Weekly] [Monthly]
+                        Row(
+                          children: [
+                            _buildFilterPill(
+                              'Today',
+                              0,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
                             ),
-                          ),
-                          TextButton.icon(
-                            icon: const Icon(Icons.add_rounded, size: 16, color: kPrimaryColor),
-                            label: const Text(
-                              'Add Schedule',
-                              style: TextStyle(
-                                color: kPrimaryColor,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            const SizedBox(width: 8),
+                            _buildFilterPill(
+                              'Weekly',
+                              1,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
                             ),
-                            onPressed: _showAddScheduleDialog,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
+                            const SizedBox(width: 8),
+                            _buildFilterPill(
+                              'Monthly',
+                              2,
+                              isDark,
+                              kCardBg,
+                              kBorderColor,
+                            ),
+                          ],
+                        ),
 
-                      // Real User-Added Upcoming Tasks List
-                      if (_upcomingTasks.isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 22),
-                          decoration: BoxDecoration(
-                            color: kCardBg,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: kBorderColor),
-                          ),
-                          child: Column(
-                            children: [
-                              Icon(Icons.event_note_rounded,
-                                  size: 34, color: kSubtextColor.withValues(alpha: 0.5)),
-                              const SizedBox(height: 8),
-                              Text(
-                                'No upcoming tasks scheduled',
-                                style: TextStyle(
-                                  color: kTextColor,
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Tap "+ Add Schedule" to set tomorrow\'s tasks & alarms!',
-                                style: TextStyle(color: kSubtextColor, fontSize: 12),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        ..._upcomingTasks.map(
-                          (task) => Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            child: _buildUpcomingCard(
-                              task: task,
+                        const SizedBox(height: 16),
+
+                        // Weekly Consistency Heatmap
+                        const WeeklyHeatmapWidget(streakDays: 1),
+
+                        const SizedBox(height: 16),
+
+                        // Interactive Water Tracker
+                        const WaterTrackerCard(),
+
+                        const SizedBox(height: 20),
+
+                        // Habits List
+                        if (_habits.isNotEmpty) ...[
+                          ..._habits.map((habit) {
+                            final isCompleted =
+                                _todayCompletion[habit.id] ?? false;
+                            return _buildHabitCard(
+                              id: habit.id,
+                              name: habit.name,
+                              subtitle: isCompleted
+                                  ? 'Completed today'
+                                  : 'Tap to mark done',
+                              icon: Icons.check_circle_outline_rounded,
+                              color: kPrimaryColor,
+                              bgColor: const Color(0xFFDBEAFE),
+                              isCompleted: isCompleted,
+                              isRealDb: true,
                               isDark: isDark,
                               cardBg: kCardBg,
                               borderColor: kBorderColor,
                               textColor: kTextColor,
                               subtextColor: kSubtextColor,
+                            );
+                          }),
+                        ] else ...[
+                          ..._defaultHabits.map((habit) {
+                            return _buildHabitCard(
+                              id: habit['id'] as String,
+                              name: habit['name'] as String,
+                              subtitle: habit['subtitle'] as String,
+                              icon: habit['icon'] as IconData,
+                              color: habit['color'] as Color,
+                              bgColor: habit['bgColor'] as Color,
+                              isCompleted: habit['completed'] as bool,
+                              isRealDb: false,
+                              isDark: isDark,
+                              cardBg: kCardBg,
+                              borderColor: kBorderColor,
+                              textColor: kTextColor,
+                              subtextColor: kSubtextColor,
+                            );
+                          }),
+                        ],
+
+                        const SizedBox(height: 24),
+
+                        // Real Upcoming Section Header with Add Button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Upcoming Schedule',
+                              style: TextStyle(
+                                color: kTextColor,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            TextButton.icon(
+                              icon: const Icon(
+                                Icons.add_rounded,
+                                size: 16,
+                                color: kPrimaryColor,
+                              ),
+                              label: const Text(
+                                'Add Schedule',
+                                style: TextStyle(
+                                  color: kPrimaryColor,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              onPressed: _showAddScheduleDialog,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Real User-Added Upcoming Tasks List
+                        if (_upcomingTasks.isEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 22,
+                            ),
+                            decoration: BoxDecoration(
+                              color: kCardBg,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: kBorderColor),
+                            ),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.event_note_rounded,
+                                  size: 34,
+                                  color: kSubtextColor.withValues(alpha: 0.5),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No upcoming tasks scheduled',
+                                  style: TextStyle(
+                                    color: kTextColor,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tap "+ Add Schedule" to set tomorrow\'s tasks & alarms!',
+                                  style: TextStyle(
+                                    color: kSubtextColor,
+                                    fontSize: 12,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          ..._upcomingTasks.map(
+                            (task) => Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              child: _buildUpcomingCard(
+                                task: task,
+                                isDark: isDark,
+                                cardBg: kCardBg,
+                                borderColor: kBorderColor,
+                                textColor: kTextColor,
+                                subtextColor: kSubtextColor,
+                              ),
                             ),
                           ),
-                        ),
 
-                      const SizedBox(height: 28),
-                    ],
+                        const SizedBox(height: 28),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-      ),
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -750,22 +936,51 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
           type: BottomNavigationBarType.fixed,
           backgroundColor: kBottomNavBg,
           selectedItemColor: kPrimaryColor,
-          unselectedItemColor: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
-          selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
+          unselectedItemColor: isDark
+              ? const Color(0xFF64748B)
+              : const Color(0xFF94A3B8),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+          ),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: 'Habits'),
-            BottomNavigationBarItem(icon: Icon(Icons.timer_outlined), label: 'Timer'),
-            BottomNavigationBarItem(icon: Icon(Icons.checklist_rounded), label: 'Tasks'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_rounded),
+              label: 'Habits',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.timer_outlined),
+              label: 'Timer',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.checklist_rounded),
+              label: 'Tasks',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              label: 'Profile',
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFilterPill(String label, int index, bool isDark, Color cardBg, Color borderColor) {
+  Widget _buildFilterPill(
+    String label,
+    int index,
+    bool isDark,
+    Color cardBg,
+    Color borderColor,
+  ) {
     final isSelected = _selectedFilterIndex == index;
     return GestureDetector(
       onTap: () {
@@ -779,9 +994,7 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         decoration: BoxDecoration(
           color: isSelected ? kPrimaryColor : cardBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? kPrimaryColor : borderColor,
-          ),
+          border: Border.all(color: isSelected ? kPrimaryColor : borderColor),
           boxShadow: isSelected
               ? [
                   BoxShadow(
@@ -795,7 +1008,9 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
         child: Text(
           label,
           style: TextStyle(
-            color: isSelected ? Colors.white : (isDark ? const Color(0xFF94A3B8) : kSecondaryText),
+            color: isSelected
+                ? Colors.white
+                : (isDark ? const Color(0xFF94A3B8) : kSecondaryText),
             fontSize: 13,
             fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
           ),
@@ -821,91 +1036,114 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
   }) {
     final displaySubtitle = _getHabitSubtitle(id, isCompleted);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isCompleted
-              ? const Color(0xFF10B981).withValues(alpha: 0.3)
-              : borderColor,
-          width: isCompleted ? 1.4 : 1.0,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
+    return Semantics(
+      button: true,
+      checked: isCompleted,
+      label: '$name. $displaySubtitle',
+      onTap: () => _toggleCompletion(id, isRealDb),
+      excludeSemantics: true,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: cardBg,
           borderRadius: BorderRadius.circular(16),
-          onTap: () => _toggleCompletion(id, isRealDb),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isDark ? color.withValues(alpha: 0.15) : bgColor,
-                    borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isCompleted
+                ? const Color(0xFF10B981).withValues(alpha: 0.3)
+                : borderColor,
+            width: isCompleted ? 1.4 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _toggleCompletion(id, isRealDb),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isDark ? color.withValues(alpha: 0.15) : bgColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: color, size: 22),
                   ),
-                  child: Icon(icon, color: color, size: 22),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: TextStyle(
-                          color: textColor,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          decoration: isCompleted ? TextDecoration.lineThrough : null,
-                          decorationColor: const Color(0xFF94A3B8),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            decoration: isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                            decorationColor: const Color(0xFF94A3B8),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        displaySubtitle,
-                        style: TextStyle(
-                          color: isCompleted ? (isDark ? const Color(0xFF00E5FF) : const Color(0xFF10B981)) : subtextColor,
-                          fontSize: 12,
-                          fontWeight: isCompleted ? FontWeight.w500 : FontWeight.w400,
+                        const SizedBox(height: 2),
+                        Text(
+                          displaySubtitle,
+                          style: TextStyle(
+                            color: isCompleted
+                                ? (isDark
+                                      ? const Color(0xFF00E5FF)
+                                      : const Color(0xFF10B981))
+                                : subtextColor,
+                            fontSize: 12,
+                            fontWeight: isCompleted
+                                ? FontWeight.w500
+                                : FontWeight.w400,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isCompleted ? const Color(0xFF10B981) : Colors.transparent,
-                    border: Border.all(
-                      color: isCompleted
-                          ? const Color(0xFF10B981)
-                          : (isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1)),
-                      width: 1.5,
+                      ],
                     ),
                   ),
-                  child: isCompleted
-                      ? const Center(
-                          child: Icon(Icons.check_rounded, color: Colors.white, size: 16),
-                        )
-                      : null,
-                ),
-              ],
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 26,
+                    height: 26,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isCompleted
+                          ? const Color(0xFF10B981)
+                          : Colors.transparent,
+                      border: Border.all(
+                        color: isCompleted
+                            ? const Color(0xFF10B981)
+                            : (isDark
+                                  ? const Color(0xFF475569)
+                                  : const Color(0xFFCBD5E1)),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: isCompleted
+                        ? const Center(
+                            child: Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          )
+                        : null,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -953,7 +1191,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
               color: priorityColor.withValues(alpha: isDark ? 0.2 : 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.event_available_rounded, color: priorityColor, size: 20),
+            child: Icon(
+              Icons.event_available_rounded,
+              color: priorityColor,
+              size: 20,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -975,10 +1217,7 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
                     const SizedBox(width: 4),
                     Text(
                       task.time,
-                      style: TextStyle(
-                        color: subtextColor,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: subtextColor, fontSize: 12),
                     ),
                   ],
                 ),
@@ -986,7 +1225,11 @@ class _HabitScreenState extends State<HabitScreen> with WidgetsBindingObserver {
             ),
           ),
           IconButton(
-            icon: Icon(Icons.delete_outline_rounded, size: 18, color: subtextColor),
+            icon: Icon(
+              Icons.delete_outline_rounded,
+              size: 18,
+              color: subtextColor,
+            ),
             onPressed: () async {
               await TaskService.deleteTask(task.id);
               await _loadData();
