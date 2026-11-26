@@ -58,8 +58,12 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
   void dispose() {
     _timerService.remainingSecondsNotifier.removeListener(_onTimerStateChanged);
     _timerService.isRunningNotifier.removeListener(_onTimerStateChanged);
-    _timerService.selectedModeIndexNotifier.removeListener(_onTimerStateChanged);
-    _timerService.completedSessionsNotifier.removeListener(_onTimerStateChanged);
+    _timerService.selectedModeIndexNotifier.removeListener(
+      _onTimerStateChanged,
+    );
+    _timerService.completedSessionsNotifier.removeListener(
+      _onTimerStateChanged,
+    );
     super.dispose();
   }
 
@@ -97,7 +101,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
               decoration: const BoxDecoration(
                 color: Color(0xFF0F172A),
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                border: Border(top: BorderSide(color: Color(0xFF1E293B), width: 1.2)),
+                border: Border(
+                  top: BorderSide(color: Color(0xFF1E293B), width: 1.2),
+                ),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
               child: SingleChildScrollView(
@@ -122,10 +128,15 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.15),
+                            color: const Color(0xFF00E5FF)
+                                .withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.timer_rounded, color: Color(0xFF00E5FF), size: 22),
+                          child: const Icon(
+                            Icons.timer_rounded,
+                            color: Color(0xFF00E5FF),
+                            size: 22,
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -142,7 +153,10 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                               ),
                               Text(
                                 'Choose how many minutes you want to focus',
-                                style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 13,
+                                ),
                               ),
                             ],
                           ),
@@ -153,7 +167,10 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
 
                     // Big Display with - / + Stepper Buttons
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 18,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF071728),
                         borderRadius: BorderRadius.circular(20),
@@ -170,7 +187,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                                 setSheetState(() => tempMinutes -= 1);
                               }
                             },
-                            icon: const Icon(Icons.remove_circle_outline_rounded),
+                            icon: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                            ),
                             color: const Color(0xFF00E5FF),
                             iconSize: 34,
                             tooltip: '-5 mins',
@@ -219,7 +238,8 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                         activeTrackColor: const Color(0xFF00E5FF),
                         inactiveTrackColor: const Color(0xFF0E3D48),
                         thumbColor: const Color(0xFF00E5FF),
-                        overlayColor: const Color(0xFF00E5FF).withValues(alpha: 0.2),
+                        overlayColor: const Color(0xFF00E5FF)
+                            .withValues(alpha: 0.2),
                         trackHeight: 6,
                       ),
                       child: Slider(
@@ -256,12 +276,18 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                           selectedColor: const Color(0xFF00E5FF),
                           backgroundColor: const Color(0xFF071728),
                           labelStyle: TextStyle(
-                            color: isSelected ? const Color(0xFF0A1124) : Colors.white,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected
+                                ? const Color(0xFF0A1124)
+                                : Colors.white,
+                            fontWeight: isSelected
+                                ? FontWeight.w700
+                                : FontWeight.w500,
                             fontSize: 12.5,
                           ),
                           side: BorderSide(
-                            color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF0E3D48),
+                            color: isSelected
+                                ? const Color(0xFF00E5FF)
+                                : const Color(0xFF0E3D48),
                           ),
                           onSelected: (selected) {
                             if (selected) {
@@ -281,7 +307,10 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                             onPressed: () => Navigator.of(ctx).pop(),
                             child: const Text(
                               'Cancel',
-                              style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                              style: TextStyle(
+                                color: Color(0xFF94A3B8),
+                                fontSize: 14,
+                              ),
                             ),
                           ),
                         ),
@@ -292,18 +321,25 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                             onPressed: () async {
                               Navigator.of(ctx).pop();
                               await _setFocusDuration(tempMinutes);
-                              _showSnackBar('Focus time set to $tempMinutes minutes! ⏱️');
+                              _showSnackBar(
+                                'Focus time set to $tempMinutes minutes! ⏱️',
+                              );
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF00E5FF),
                               foregroundColor: const Color(0xFF0A1124),
                               padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
                               elevation: 0,
                             ),
                             child: const Text(
                               'Set Focus Time',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                              ),
                             ),
                           ),
                         ),
@@ -332,7 +368,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final progress = _totalSeconds > 0 ? _remainingSeconds / _totalSeconds : 0.0;
+    final progress = _totalSeconds > 0
+        ? _remainingSeconds / _totalSeconds
+        : 0.0;
 
     return Scaffold(
       backgroundColor: const Color(0xFF030814),
@@ -341,7 +379,11 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 22),
+          icon: const Icon(
+            Icons.arrow_back_rounded,
+            color: Colors.white,
+            size: 22,
+          ),
           onPressed: () {
             if (Navigator.of(context).canPop()) {
               Navigator.of(context).pop();
@@ -361,7 +403,11 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
         centerTitle: false,
         actions: [
           IconButton(
-            icon: const Icon(Icons.tune_rounded, color: Color(0xFF00E5FF), size: 22),
+            icon: const Icon(
+              Icons.tune_rounded,
+              color: Color(0xFF00E5FF),
+              size: 22,
+            ),
             tooltip: 'Customize Focus Time',
             onPressed: _showDurationPickerSheet,
           ),
@@ -369,7 +415,7 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, kFloatingNavClearance),
           child: Column(
             children: [
               // Mode Selector Tabs [Pomodoro] [Short Break] [Long Break]
@@ -414,10 +460,14 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                             borderRadius: BorderRadius.circular(16),
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? const Color(0xFF00E5FF).withValues(alpha: 0.2)
+                                    ? const Color(0xFF00E5FF)
+                                          .withValues(alpha: 0.2)
                                     : const Color(0xFF071728),
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
@@ -429,9 +479,13 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                               child: Text(
                                 '$mins min',
                                 style: TextStyle(
-                                  color: isSelected ? const Color(0xFF00E5FF) : const Color(0xFF94A3B8),
+                                  color: isSelected
+                                      ? const Color(0xFF00E5FF)
+                                      : const Color(0xFF94A3B8),
                                   fontSize: 11.5,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
                                 ),
                               ),
                             ),
@@ -443,7 +497,10 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                         onTap: _showDurationPickerSheet,
                         borderRadius: BorderRadius.circular(16),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF071728),
                             borderRadius: BorderRadius.circular(16),
@@ -452,7 +509,11 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: const [
-                              Icon(Icons.edit_outlined, color: Color(0xFF00E5FF), size: 12),
+                              Icon(
+                                Icons.edit_outlined,
+                                color: Color(0xFF00E5FF),
+                                size: 12,
+                              ),
                               SizedBox(width: 4),
                               Text(
                                 'Custom',
@@ -491,7 +552,8 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00E5FF).withValues(alpha: 0.18),
+                              color: const Color(0xFF00E5FF)
+                                  .withValues(alpha: 0.18),
                               blurRadius: 36,
                               spreadRadius: 6,
                             ),
@@ -540,8 +602,8 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                                 _selectedModeIndex == 0
                                     ? 'Focus Time'
                                     : _selectedModeIndex == 1
-                                        ? 'Short Break'
-                                        : 'Long Break',
+                                    ? 'Short Break'
+                                    : 'Long Break',
                                 style: TextStyle(
                                   color: Colors.white.withValues(alpha: 0.7),
                                   fontSize: 13,
@@ -550,7 +612,11 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                               ),
                               if (!_isRunning && _selectedModeIndex == 0) ...[
                                 const SizedBox(width: 4),
-                                const Icon(Icons.edit_rounded, color: Color(0xFF00E5FF), size: 13),
+                                const Icon(
+                                  Icons.edit_rounded,
+                                  color: Color(0xFF00E5FF),
+                                  size: 13,
+                                ),
                               ],
                             ],
                           ),
@@ -560,7 +626,8 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                               child: Text(
                                 'Tap to change duration',
                                 style: TextStyle(
-                                  color: const Color(0xFF00E5FF).withValues(alpha: 0.7),
+                                  color: const Color(0xFF00E5FF)
+                                      .withValues(alpha: 0.7),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -607,7 +674,9 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
                         ],
                       ),
                       child: Icon(
-                        _isRunning ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        _isRunning
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
                         color: Colors.white,
                         size: 36,
                       ),
@@ -662,7 +731,10 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
 
               // Daily Focus Stats Card
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFF071728),
                   borderRadius: BorderRadius.circular(18),
@@ -756,14 +828,35 @@ class _StudyTimerScreenState extends State<StudyTimerScreen> {
           backgroundColor: const Color(0xFF050E1A),
           selectedItemColor: const Color(0xFF00E5FF),
           unselectedItemColor: const Color(0xFF64748B),
-          selectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w400),
+          selectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w400,
+          ),
           items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: 'Habits'),
-            BottomNavigationBarItem(icon: Icon(Icons.timer_outlined), label: 'Timer'),
-            BottomNavigationBarItem(icon: Icon(Icons.checklist_rounded), label: 'Tasks'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Profile'),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'Home',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.calendar_today_rounded),
+              label: 'Habits',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.timer_outlined),
+              label: 'Timer',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.checklist_rounded),
+              label: 'Tasks',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              label: 'Profile',
+            ),
           ],
         ),
       ),

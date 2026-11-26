@@ -753,6 +753,74 @@ class NotificationService {
     }
   }
 
+  /// Schedules a single habit nudge at [scheduledDate].
+  ///
+  /// Used by the streak-at-risk planner, which works out one timing per day
+  /// from the user's own completion history.
+  static Future<void> scheduleHabitReminder({
+    required int id,
+    required String title,
+    required String body,
+    required DateTime scheduledDate,
+  }) async {
+    if (kIsWeb) return;
+    try {
+      if (!scheduledDate.isAfter(DateTime.now())) return;
+      _setupLocalTimezone();
+      final tzDateTime = tz.TZDateTime.from(scheduledDate, tz.local);
+
+      const androidDetails = AndroidNotificationDetails(
+        _habitsChannelId,
+        _habitsChannelName,
+        channelDescription: _habitsChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        playSound: true,
+        enableVibration: true,
+        autoCancel: true,
+      );
+
+      const notificationDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        ),
+      );
+
+      // Deliberately no in-app Timer: the nudge is a background courtesy, so
+      // the OS schedule alone drives it and nothing pending keeps the app or a
+      // test alive.
+      await _notificationsPlugin.zonedSchedule(
+        id,
+        title,
+        body,
+        tzDateTime,
+        notificationDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+      );
+      debugPrint('Streak reminder scheduled for $tzDateTime (id: $id)');
+    } catch (e) {
+      debugPrint('Error scheduling streak reminder: $e');
+    }
+  }
+
+  /// Cancels a previously scheduled habit reminder.
+  static Future<void> cancelHabitReminder(int id) async {
+    try {
+      _activeTimers[id]?.cancel();
+      _activeTimers.remove(id);
+      if (!kIsWeb) {
+        await _notificationsPlugin.cancel(id);
+      }
+    } catch (e) {
+      debugPrint('Error cancelling streak reminder: $e');
+    }
+  }
+
   /// Schedules recurring daily hydration reminders across the day (9 AM, 11 AM, 1:30 PM, 4 PM, 6:30 PM, 8:30 PM)
   /// in Marathi, Hindi, or English so users stay hydrated even when the app is closed.
   static Future<void> scheduleDailyHydrationReminders() async {

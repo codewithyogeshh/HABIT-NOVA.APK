@@ -15,6 +15,9 @@ class TaskItem {
   bool isUpcoming;
   DateTime? scheduledDate;
 
+  /// When the task was ticked; used to lock un-ticking for 24 hours.
+  DateTime? completedAt;
+
   TaskItem({
     required this.id,
     required this.title,
@@ -23,6 +26,7 @@ class TaskItem {
     this.isCompleted = false,
     this.isUpcoming = false,
     this.scheduledDate,
+    this.completedAt,
   });
 
   Map<String, dynamic> toMap() => {
@@ -33,6 +37,7 @@ class TaskItem {
         'isCompleted': isCompleted,
         'isUpcoming': isUpcoming,
         'scheduledDate': scheduledDate?.toIso8601String(),
+        'completedAt': completedAt?.toIso8601String(),
       };
 
   factory TaskItem.fromMap(Map<String, dynamic> map) => TaskItem(
@@ -44,6 +49,9 @@ class TaskItem {
         isUpcoming: map['isUpcoming'] as bool? ?? false,
         scheduledDate: map['scheduledDate'] != null
             ? DateTime.tryParse(map['scheduledDate'] as String)
+            : null,
+        completedAt: map['completedAt'] != null
+            ? DateTime.tryParse(map['completedAt'] as String)
             : null,
       );
 }
@@ -126,6 +134,8 @@ class TaskService {
     final idx = tasks.indexWhere((t) => t.id == task.id);
     if (idx != -1) {
       tasks[idx].isCompleted = !tasks[idx].isCompleted;
+      tasks[idx].completedAt =
+          tasks[idx].isCompleted ? DateTime.now() : null;
       final notifId = task.id.hashCode & 0x7fffffff;
 
       if (tasks[idx].isCompleted) {

@@ -1,4 +1,5 @@
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -58,15 +59,18 @@ class _SlidingPillNavBarState extends State<SlidingPillNavBar>
     );
     _previousPosition = widget.currentIndex.toDouble();
     _targetPosition = widget.currentIndex.toDouble();
-    _slideAnimation = Tween<double>(
-      begin: _previousPosition,
-      end: _targetPosition,
-    ).animate(
-      CurvedAnimation(
-        parent: _controller,
-        curve: const Cubic(0.22, 1.0, 0.36, 1.0), // Snappy Apple-style spring
-      ),
-    );
+    _slideAnimation =
+        Tween<double>(begin: _previousPosition, end: _targetPosition).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Cubic(
+              0.22,
+              1.0,
+              0.36,
+              1.0,
+            ), // Snappy Apple-style spring
+          ),
+        );
   }
 
   @override
@@ -75,15 +79,13 @@ class _SlidingPillNavBarState extends State<SlidingPillNavBar>
     if (oldWidget.currentIndex != widget.currentIndex) {
       _previousPosition = _slideAnimation.value;
       _targetPosition = widget.currentIndex.toDouble();
-      _slideAnimation = Tween<double>(
-        begin: _previousPosition,
-        end: _targetPosition,
-      ).animate(
-        CurvedAnimation(
-          parent: _controller,
-          curve: const Cubic(0.22, 1.0, 0.36, 1.0),
-        ),
-      );
+      _slideAnimation =
+          Tween<double>(begin: _previousPosition, end: _targetPosition).animate(
+            CurvedAnimation(
+              parent: _controller,
+              curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+            ),
+          );
       _controller.forward(from: 0.0);
     }
   }
@@ -148,7 +150,8 @@ class _SlidingPillNavBarState extends State<SlidingPillNavBar>
 
                         // Stretch factor based on animation progress: peaks at t=0.5
                         final progress = _controller.value;
-                        final stretch = (progress < 0.5
+                        final stretch =
+                            (progress < 0.5
                                 ? progress * 2
                                 : (1.0 - progress) * 2) *
                             0.12;
@@ -163,7 +166,9 @@ class _SlidingPillNavBarState extends State<SlidingPillNavBar>
                             scaleY: 1.0 - (stretch * 0.5),
                             child: Container(
                               margin: const EdgeInsets.symmetric(
-                                  horizontal: 4, vertical: 2),
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: isDark
@@ -211,14 +216,23 @@ class _SlidingPillNavBarState extends State<SlidingPillNavBar>
                         final isSelected = widget.currentIndex == index;
 
                         return Expanded(
-                          child: _SlidingPillTabButton(
-                            item: item,
-                            isSelected: isSelected,
-                            isDark: isDark,
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              widget.onTap(index);
-                            },
+                          // Screen readers get a proper button with a label and
+                          // selected state instead of a bare icon row.
+                          child: Semantics(
+                            button: true,
+                            selected: isSelected,
+                            label: item.label,
+                            onTap: () => widget.onTap(index),
+                            excludeSemantics: true,
+                            child: _SlidingPillTabButton(
+                              item: item,
+                              isSelected: isSelected,
+                              isDark: isDark,
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                widget.onTap(index);
+                              },
+                            ),
                           ),
                         );
                       }),
@@ -291,8 +305,8 @@ class _SlidingPillTabButtonState extends State<_SlidingPillTabButton> {
                     color: isSelected
                         ? const Color(0xFF00E5FF)
                         : (isDark
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFF94A3B8)),
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8)),
                   ),
                 ),
                 if (widget.item.badge != null)
@@ -301,7 +315,9 @@ class _SlidingPillTabButtonState extends State<_SlidingPillTabButton> {
                     right: -6,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 4, vertical: 1),
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.redAccent,
                         borderRadius: BorderRadius.circular(8),
@@ -326,13 +342,18 @@ class _SlidingPillTabButtonState extends State<_SlidingPillTabButton> {
                 color: isSelected
                     ? (isDark ? Colors.white : const Color(0xFF0F172A))
                     : (isDark
-                        ? const Color(0xFF64748B)
-                        : const Color(0xFF94A3B8)),
+                          ? const Color(0xFF64748B)
+                          : const Color(0xFF94A3B8)),
                 fontSize: 10.5,
+                height: 1.0,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                 letterSpacing: isSelected ? 0.2 : 0.0,
               ),
-              child: Text(widget.item.label),
+              child: Text(
+                widget.item.label,
+                maxLines: 1,
+                overflow: TextOverflow.visible,
+              ),
             ),
           ],
         ),
@@ -360,7 +381,8 @@ class SlidingPillSegmentedBar extends StatefulWidget {
   });
 
   @override
-  State<SlidingPillSegmentedBar> createState() => _SlidingPillSegmentedBarState();
+  State<SlidingPillSegmentedBar> createState() =>
+      _SlidingPillSegmentedBarState();
 }
 
 class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
@@ -380,10 +402,12 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
     _prevIndex = widget.selectedIndex.toDouble();
     _targetIndex = widget.selectedIndex.toDouble();
     _slideAnimation = Tween<double>(begin: _prevIndex, end: _targetIndex)
-        .animate(CurvedAnimation(
-      parent: _controller,
-      curve: const Cubic(0.22, 1.0, 0.36, 1.0),
-    ));
+        .animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+          ),
+        );
   }
 
   @override
@@ -393,10 +417,12 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
       _prevIndex = _slideAnimation.value;
       _targetIndex = widget.selectedIndex.toDouble();
       _slideAnimation = Tween<double>(begin: _prevIndex, end: _targetIndex)
-          .animate(CurvedAnimation(
-        parent: _controller,
-        curve: const Cubic(0.22, 1.0, 0.36, 1.0),
-      ));
+          .animate(
+            CurvedAnimation(
+              parent: _controller,
+              curve: const Cubic(0.22, 1.0, 0.36, 1.0),
+            ),
+          );
       _controller.forward(from: 0.0);
     }
   }
@@ -436,7 +462,9 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
                   final cur = _slideAnimation.value;
                   final left = cur * tabWidth;
                   final progress = _controller.value;
-                  final stretch = (progress < 0.5 ? progress * 2 : (1.0 - progress) * 2) * 0.10;
+                  final stretch =
+                      (progress < 0.5 ? progress * 2 : (1.0 - progress) * 2) *
+                      0.10;
 
                   return Positioned(
                     left: left,
@@ -452,12 +480,14 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
                               : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: const Color(0xFF00E5FF).withValues(alpha: 0.6),
+                            color: const Color(0xFF00E5FF)
+                                .withValues(alpha: 0.6),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF00E5FF).withValues(alpha: 0.20),
+                              color: const Color(0xFF00E5FF)
+                                  .withValues(alpha: 0.20),
                               blurRadius: 10,
                               offset: const Offset(0, 2),
                             ),
@@ -492,20 +522,24 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
                               color: isSelected
                                   ? const Color(0xFF00E5FF)
                                   : (isDark
-                                      ? const Color(0xFF64748B)
-                                      : const Color(0xFF94A3B8)),
+                                        ? const Color(0xFF64748B)
+                                        : const Color(0xFF94A3B8)),
                             ),
                             const SizedBox(width: 6),
                             Text(
                               tab.label,
                               style: TextStyle(
                                 color: isSelected
-                                    ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                    ? (isDark
+                                          ? Colors.white
+                                          : const Color(0xFF0F172A))
                                     : (isDark
-                                        ? const Color(0xFF94A3B8)
-                                        : const Color(0xFF64748B)),
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B)),
                                 fontSize: 13,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
                               ),
                             ),
                           ],
@@ -522,4 +556,3 @@ class _SlidingPillSegmentedBarState extends State<SlidingPillSegmentedBar>
     );
   }
 }
-

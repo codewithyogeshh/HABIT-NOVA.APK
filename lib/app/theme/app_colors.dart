@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 /// Primary brand color: #0284C7 (Vibrant Cyan-Blue) & #2F65F6
 const Color kPrimaryColor = Color(0xFF0284C7);
 
+/// Bottom scroll padding that keeps screen content clear of the floating
+/// pill navigation bar, so the last card never sits underneath it.
+const double kFloatingNavClearance = 96;
+
 /// Primary color variants
 const Color kPrimaryLight = Color(0xFF38BDF8);
 const Color kPrimaryDark = Color(0xFF0369A1);
@@ -53,10 +57,18 @@ const Color kFocusColor = Color(0xFF0284C7);
 const Color kScrimColor = Color(0x80000000);
 
 /// Bioluminescent Zen & Glassmorphic Palette (from user master mockup images)
-const Color kBioluminescentBg = Color(0xFF030814); // Deep obsidian midnight background
-const Color kBioluminescentSurface = Color(0xFF071728); // Dark translucent glass card
-const Color kBioluminescentBorder = Color(0xFF0E3D48); // Glowing teal/cyan glass border
-const Color kNeonCyan = Color(0xFF00F0FF); // Electric neon cyan for progress & timer
+const Color kBioluminescentBg = Color(
+  0xFF030814,
+); // Deep obsidian midnight background
+const Color kBioluminescentSurface = Color(
+  0xFF071728,
+); // Dark translucent glass card
+const Color kBioluminescentBorder = Color(
+  0xFF0E3D48,
+); // Glowing teal/cyan glass border
+const Color kNeonCyan = Color(
+  0xFF00F0FF,
+); // Electric neon cyan for progress & timer
 const Color kTealCyan = Color(0xFF0284C7); // Cyan gradient start
 const Color kTealEmerald = Color(0xFF0D9488); // Emerald teal gradient end
 
